@@ -80,10 +80,3 @@ class Backend(object):
         self.queue.remove(job_id)
 
         # TODO: add it to the list of completed jobs.
-
-
-class Function(namedtuple("_Function", ["module", "funcname"])):
-
-    def serialize(self):
-        # Since this is all in memory, there is no need to serialize anything.
-        return self
