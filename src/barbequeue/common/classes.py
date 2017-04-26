@@ -47,7 +47,7 @@ class Client(object):
         pass
 
     def status(self, job_id):
-        pass
+        return self.backend.get_job(job_id)
 
     @staticmethod
     def _stringify_func(func):
