@@ -32,6 +32,9 @@ class Client(object):
         self.backend = self.backend_module.Backend(app, namespace)
 
     def schedule(self, func, updates_progress=False, *args, **kwargs):
+        """
+        Schedules a function func for execution.
+        """
 
         # turn our function object into its fully qualified name if needed
         if callable(func):
@@ -47,6 +50,9 @@ class Client(object):
         pass
 
     def status(self, job_id):
+        """
+        Gets the status of a job given by job_id.
+        """
         return self.backend.get_job(job_id)
 
     @staticmethod
