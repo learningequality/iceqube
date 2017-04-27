@@ -47,7 +47,11 @@ class Client(object):
         return job_id
 
     def cancel(self, job_id):
-        pass
+        """
+        Mark a job as canceled and remove it from the list of jobs to be executed.
+        Send a message to our workers to stop a job.
+        """
+        self.backend.cancel_job(job_id)
 
     def status(self, job_id):
         """

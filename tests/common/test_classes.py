@@ -38,3 +38,10 @@ class TestClient(object):
         assert client.status(
             scheduled_job.job_id
         ).job_id == scheduled_job.job_id
+
+    def test_can_cancel_a_job(self, client, scheduled_job):
+        client.cancel(scheduled_job.job_id)
+
+        # Is our job marked as canceled?
+        job = client.status(scheduled_job.job_id)
+        assert job.state == Job.State.CANCELED
