@@ -60,6 +60,8 @@ setup(
         str('barbequeue.scheduler'),
         str('barbequeue.common'),
         str('barbequeue.storage.backends'),
+        str('barbequeue.messaging'),
+        str('barbequeue.messaging.backends'),
     ],
     package_dir={'barbequeue': 'src/barbequeue'},
     include_package_data=True,

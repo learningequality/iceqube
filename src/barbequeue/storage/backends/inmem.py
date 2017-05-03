@@ -1,5 +1,5 @@
 import uuid
-from collections import defaultdict, deque, namedtuple
+from collections import defaultdict, deque
 from copy import copy
 
 from barbequeue.common.classes import Job
