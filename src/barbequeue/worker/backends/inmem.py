@@ -25,6 +25,10 @@ class Backend(object):
                 shutdownevent=self.worker_shutdown_event,
                 reportqueue=self.reportqueue)
             self.worker_threads.append(t)
+            # Label the worker threads as daemon, allowing the python
+            # interpreter to shut down even if the worker threads are still
+            # running
+            t.daemon = True
             t.start()
 
     def recv(self):
