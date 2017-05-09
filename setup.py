@@ -37,8 +37,7 @@ def enable_log_to_stdout(logname):
     ch.setLevel(logging.DEBUG)
     # create formatter
     formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     # add formatter to ch
     ch.setFormatter(formatter)
     # add ch to logger
@@ -50,8 +49,7 @@ setup(
     version="0.0.1",
     description=description,
     long_description="{readme}".format(
-        readme=readme,
-    ),
+        readme=readme, ),
     author='Learning Equality',
     author_email='aron+barbequeue@learningequality.org',
     url='https://github.com/learningequality/barbequeue',
@@ -62,6 +60,8 @@ setup(
         str('barbequeue.storage.backends'),
         str('barbequeue.messaging'),
         str('barbequeue.messaging.backends'),
+        str('barbequeue.worker'),
+        str('barbequeue.worker.backends'),
     ],
     package_dir={'barbequeue': 'src/barbequeue'},
     include_package_data=True,
@@ -81,5 +81,4 @@ setup(
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: Implementation :: PyPy',
-    ],
-)
+    ], )
