@@ -1,11 +1,13 @@
 import importlib
 import logging
 import queue
+import time
 import uuid
 from threading import Event, Thread
 
 from barbequeue import humanhash
-from barbequeue.messaging.classes import MessageType
+from barbequeue.messaging.backends.inmem import Backend as MsgBackend
+from barbequeue.messaging.classes import MessageType, UnknownMessageError
 
 logging.basicConfig()
 
@@ -15,9 +17,11 @@ class Backend(object):
         self.mailbox = mailbox
         self.jobqueue = queue.Queue()
         self.reportqueue = queue.Queue()
+        self.msgbackend = MsgBackend()
         self.worker_threads = []
-        self.worker_shutdown_event = Event()
 
+        # start the worker threads
+        self.worker_shutdown_event = Event()
         for _ in range(num_threads):
             t = WorkerThread(
                 parent=self,
@@ -31,22 +35,76 @@ class Backend(object):
             t.daemon = True
             t.start()
 
-    def recv(self):
-        """
-        Read a message from the backend, and then pass it to the handle_msg function.
-        """
-        pass
+        # start the backend monitor thread to check our mailbox and handle
+        # messages received from there
+        self.monitor_shutdown_event = Event()
+        self.monitor_thread = MonitorThread(
+            parent=self,
+            jobqueue=self.jobqueue,
+            msgbackend=self.msgbackend,
+            mailbox=self.mailbox,
+            shutdownevent=self.monitor_shutdown_event)
+        # self.monitor_thread.daemon = True
+        self.monitor_thread.start()
 
-    def handle_msg(self, msg):
+    def start_job(self, job):
+        """Manually schedule a job given by job. A simple proxy to the Monitor
+        Thread's self.start_job command."""
+        self.monitor_thread.start_job(job)
 
+    def shutdown(self):
+        self.monitor_shutdown_event.set()
+        self.worker_shutdown_event.set()
+
+
+class MonitorThread(Thread):
+    def __init__(self, parent, jobqueue, msgbackend, mailbox, shutdownevent,
+                 *args, **kwargs):
+        self.parent = parent
+        self.jobqueue = jobqueue
+        self.msgbackend = msgbackend
+        self.mailbox = mailbox
+        self.thread_id = self._generate_thread_id()
+        self.logger = logging.getLogger(
+            "{}.MONITOR[{}]".format(__name__, self.thread_id))
+        self.shutdown_event = shutdownevent
+
+        super(MonitorThread, self).__init__(*args, **kwargs)
+
+    def run(self):
+        self.logger.debug("Hello world! I'm a new monitor thread.")
+
+        while True:
+            if self.shutdown_event.wait(timeout=0.2):
+                self.logger.warning(
+                    "MONITOR shutdown event received; closing.")
+                break
+            else:
+                try:
+                    msg = self.recv(timeout=0.2)
+                    self.handle_messages(msg)
+                except queue.Empty:
+                    continue
+
+    def recv(self, timeout=0.2):
+        return self.msgbackend.pop(self.mailbox, timeout=timeout)
+
+    def handle_message(self, msg):
         if msg.type == MessageType.START_JOB:
-            pass
+            job = msg.message['job']
+            self.start_job(job)
+        elif msg.type == MessageType.CANCEL_JOB:
+            raise NotImplemented()
+        else:
+            raise UnknownMessageError()
 
     def start_job(self, job):
         self.jobqueue.put(job)
 
-    def shutdown(self):
-        self.worker_shutdown_event.set()
+    @staticmethod
+    def _generate_thread_id():
+        id, hex = humanhash.uuid()
+        return id
 
 
 class WorkerThread(Thread):
@@ -58,7 +116,7 @@ class WorkerThread(Thread):
         self.shutdown_event = shutdownevent
         self.thread_id = self._generate_thread_id()
         self.logger = logging.getLogger(
-            "{}.thread[{}]".format(__name__, self.thread_id))
+            "{}.WORKER[{}]".format(__name__, self.thread_id))
         super(WorkerThread, self).__init__(*args, **kwargs)
 
     def run(self):
@@ -66,7 +124,7 @@ class WorkerThread(Thread):
         while True:
             if self.shutdown_event.is_set():
                 # start shutdown process
-                self.logger.warning("Shutdown event received; closing.")
+                self.logger.warning("WORKER shutdown event received; closing.")
                 break
             else:
                 # continue processing jobs

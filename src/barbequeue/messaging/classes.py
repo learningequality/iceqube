@@ -4,6 +4,10 @@ import logging
 from collections import namedtuple
 
 
+class UnknownMessageError(Exception):
+    pass
+
+
 class MessageType(enum.Enum):
     # Job status messages
     JOB_FAILED = 0  # 0, so it can be falsey
@@ -17,7 +21,6 @@ class MessageType(enum.Enum):
 
 
 class Message(namedtuple("_Message", ["type", "message"])):
-
     def serialize(self):
         # check that message type is in one of the message types we define
         assert self.type in (
