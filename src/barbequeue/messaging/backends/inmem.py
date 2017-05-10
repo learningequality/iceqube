@@ -1,23 +1,19 @@
 import logging
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict, deque
+from queue import Queue
 
 logger = logging.getLogger(__name__)
 
-INMEM_SUPER_MAILBOX = defaultdict(lambda: deque())
+INMEM_SUPER_MAILBOX = defaultdict(lambda: Queue())
 
 
 class BaseBackend(metaclass=ABCMeta):
-
     @abstractmethod
     def send(self, mailbox, message, **kwargs):
         """
         Send a message to receivers of the mailbox.
         """
-        pass
-
-    @abstractmethod
-    def peek(self, mailbox):
         pass
 
     @abstractmethod
@@ -34,21 +30,15 @@ class BaseBackend(metaclass=ABCMeta):
 
 
 class Backend(BaseBackend):
-
     def __init__(self, *args, **kwargs):
         pass
 
     def send(self, mailbox, message):
-        INMEM_SUPER_MAILBOX[mailbox].append(message)
+        INMEM_SUPER_MAILBOX[mailbox].put(message)
         logger.debug("SEND MAILBOX: {} MSG: {}".format(mailbox, message))
 
-    def peek(self, mailbox):
-        msg = INMEM_SUPER_MAILBOX[mailbox][0]
-        logger.debug("PEEK MAILBOX: {} MSG: {}".format(mailbox, msg))
-        return msg
-
-    def pop(self, mailbox):
-        msg = INMEM_SUPER_MAILBOX[mailbox].popleft()
+    def pop(self, mailbox, timeout=0.2):
+        msg = INMEM_SUPER_MAILBOX[mailbox].get(block=True, timeout=timeout)
         logger.debug("POP MAILBOX: {} MSG: {}".format(mailbox, msg))
         return msg
 
