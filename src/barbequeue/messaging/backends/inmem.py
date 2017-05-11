@@ -9,7 +9,9 @@ logger = logging.getLogger(__name__)
 INMEM_SUPER_MAILBOX = defaultdict(lambda: Queue())
 
 
-class BaseBackend(metaclass=ABCMeta):
+class BaseBackend(object):
+    __metaclass__ = ABCMeta
+
     @abstractmethod
     def send(self, mailbox, message, **kwargs):
         """
