@@ -1,6 +1,9 @@
 import enum
 import importlib
+import logging
 from collections import namedtuple
+
+logger = logging.getLogger(__name__)
 
 
 class Job(object):
@@ -29,7 +32,7 @@ class Job(object):
         modulename, funcname = fqn.rsplit('.', 1)
         mod = importlib.import_module(modulename)
         assert hasattr(
-            mod, funcname),\
+            mod, funcname), \
             "Module {} does not have attribute {}".format(
                 mod, funcname)
 
