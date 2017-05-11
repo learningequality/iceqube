@@ -22,6 +22,12 @@ def startmsg(job):
     return msg
 
 
+@pytest.fixture
+def simplejob():
+    job = Job("builtins.id", 'test', job_id='simplejob')
+    return job
+
+
 ID_SET = None
 
 
@@ -35,22 +41,22 @@ def job():
     global ID_SET
     test_func_name = "{module}.{func}".format(module=__name__, func="testfunc")
     yield Job(test_func_name, job_id="test", val="passme")
-    ID_SET = None  #  reset the value set by testfunc
+    ID_SET = None  # reset the value set by testfunc
 
 
-class TestBackend:
-    def test_start_job_runs_a_function_defined_in_job(self, worker, job):
+class TestWorker:
+    def test_successful_job_adds_to_report_queue(self, worker, simplejob, mocker):
+        mocker.spy(worker.reportqueue, 'put')
 
-        reply = worker.start_job(job)
-        # make sure tasks are processed before continuing
+        worker.start_job(simplejob)
         worker.jobqueue.join()
-        assert ID_SET
+
+        assert worker.reportqueue.put.call_count == 1
+        assert simplejob == worker.reportqueue.put.call_args[0][0].message.get('job')
 
 
 class TestMonitor:
-    def test_handle_messages_start_message_starts_a_job(
-            self, worker, startmsg, job, mocker):
-
+    def test_handle_messages_start_message_starts_a_job(self, worker, startmsg, job, mocker):
         mocker.spy(worker.monitor_thread, 'start_job')
         worker.monitor_thread.handle_message(startmsg)
 
@@ -60,7 +66,6 @@ class TestMonitor:
 
     def test_recv_reads_from_messaging_backend(self, worker, startmsg, mocker,
                                                mailbox):
-
         # we assume that monitor.recv mostly looks at the pop method.
         mocker.spy(worker.msgbackend, 'pop')
         worker.msgbackend.send(mailbox, startmsg)
