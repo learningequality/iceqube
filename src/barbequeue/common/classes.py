@@ -15,14 +15,9 @@ class Job(object):
         CANCELED = 4
         COMPLETED = 5
 
-    def __init__(self,
-                 func_string,
-                 state=State.SCHEDULED,
-                 job_id=None,
-                 *args,
-                 **kwargs):
-        self.job_id = job_id
-        self.state = state
+    def __init__(self, func_string, *args, **kwargs):
+        self.job_id = kwargs.pop('job_id', None)
+        self.state = kwargs.pop('state', self.State.SCHEDULED)
         self.func = func_string
         self.args = args
         self.kwargs = kwargs

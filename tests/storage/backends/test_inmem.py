@@ -21,7 +21,6 @@ def simplejob():
 
 
 class TestBackend:
-
     def test_can_schedule_single_job(self, defaultbackend, simplejob):
         job_id = defaultbackend.schedule_job(simplejob)
 

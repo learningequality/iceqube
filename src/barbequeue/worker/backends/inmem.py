@@ -6,8 +6,6 @@ from barbequeue import humanhash
 from barbequeue.messaging.backends.inmem import Backend as MsgBackend
 from barbequeue.messaging.classes import MessageType, UnknownMessageError, Message
 
-logging.basicConfig(level=logging.DEBUG)
-
 
 class Backend(object):
     def __init__(self, mailbox, num_threads=3, *args, **kwargs):
@@ -142,8 +140,6 @@ class WorkerThread(Thread):
         func = job.get_lambda_to_execute()
 
         self.logger.info("Executing job {}".format(job.job_id))
-        import pdb;
-        pdb.set_trace()
         try:
             ret = func()
             self._notify_success(job)
@@ -158,8 +154,6 @@ class WorkerThread(Thread):
         pass
 
     def _notify_success(self, job):
-        import pdb;
-        pdb.set_trace()
         msg = Message(type=MessageType.JOB_COMPLETED, message={'job': job})
         self.reportqueue.put(msg)
 

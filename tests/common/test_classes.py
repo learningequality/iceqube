@@ -27,7 +27,6 @@ def scheduled_job(client, simplejob):
 
 
 class TestClient(object):
-
     def test_schedules_a_function(self, client, backend):
         job_id = client.schedule(id)
 
