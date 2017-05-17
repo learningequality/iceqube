@@ -3,6 +3,7 @@ import queue
 from threading import Event, Thread
 
 from barbequeue import humanhash
+from barbequeue.common.classes import BaseCloseableThread
 from barbequeue.messaging.backends.inmem import Backend as MsgBackend
 from barbequeue.messaging.classes import MessageType, UnknownMessageError, Message
 
@@ -56,34 +57,22 @@ class Backend(object):
         self.worker_shutdown_event.set()
 
 
-class MonitorThread(Thread):
+class MonitorThread(BaseCloseableThread):
     def __init__(self, parent, jobqueue, msgbackend, mailbox, shutdownevent,
                  *args, **kwargs):
         self.parent = parent
         self.jobqueue = jobqueue
         self.msgbackend = msgbackend
         self.mailbox = mailbox
-        self.thread_id = self._generate_thread_id()
-        self.logger = logging.getLogger(
-            "{}.MONITOR[{}]".format(__name__, self.thread_id))
-        self.shutdown_event = shutdownevent
 
-        super(MonitorThread, self).__init__(*args, **kwargs)
+        super(MonitorThread, self).__init__(shutdown_event=shutdownevent, thread_name="MONITOR", *args, **kwargs)
 
-    def run(self):
-        self.logger.debug("Hello world! I'm a new monitor thread.")
-
-        while True:
-            if self.shutdown_event.wait(timeout=0.2):
-                self.logger.warning(
-                    "MONITOR shutdown event received; closing.")
-                break
-            else:
-                try:
-                    msg = self.recv(timeout=0.2)
-                    self.handle_message(msg)
-                except queue.Empty:
-                    continue
+    def main_loop(self, timeout):
+        try:
+            msg = self.recv(timeout=timeout)
+            self.handle_message(msg)
+        except queue.Empty:
+            pass
 
     def recv(self, timeout=0.2):
         return self.msgbackend.pop(self.mailbox, timeout=timeout)
