@@ -36,7 +36,7 @@ class Backend(BaseBackend):
     def __init__(self, *args, **kwargs):
         pass
 
-    def send(self, mailbox, message):
+    def send(self, mailbox, message, *args, **kwargs):
         INMEM_SUPER_MAILBOX[mailbox].put(message)
         logger.debug("SEND MAILBOX: {} MSG: {}".format(mailbox, message))
 
