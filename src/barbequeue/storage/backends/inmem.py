@@ -3,18 +3,19 @@ from collections import defaultdict, deque
 from copy import copy
 
 from barbequeue.common.classes import Job
+from barbequeue.storage.backends.default import BaseBackend
 
 INMEM_STORAGE = {}
 INMEM_QUEUE = defaultdict(lambda: deque())
 
 
-class Backend(object):
-
-    def __init__(self, app, namespace, *args, **kwargs):
+class Backend(BaseBackend):
+    def __init__(self, app=None, namespace=None, *args, **kwargs):
         self.app = app
         self.namespace = namespace
         self.namespace_id = uuid.uuid5(uuid.NAMESPACE_DNS, app + namespace).hex
         self.queue = INMEM_QUEUE[self.namespace_id]
+        super(Backend, self).__init__(*args, **kwargs)
 
     def schedule_job(self, job_details):
         """
