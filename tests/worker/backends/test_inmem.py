@@ -1,4 +1,5 @@
 import pytest
+
 from barbequeue.common.classes import Job
 from barbequeue.messaging.classes import Message, MessageType
 from barbequeue.worker.backends import inmem
@@ -11,7 +12,7 @@ def mailbox():
 
 @pytest.fixture
 def worker(mailbox):
-    b = inmem.Backend(mailbox=mailbox)
+    b = inmem.Backend(incoming_message_mailbox=mailbox)
     yield b
     b.shutdown()
 

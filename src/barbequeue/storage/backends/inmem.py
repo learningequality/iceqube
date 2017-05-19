@@ -10,7 +10,7 @@ INMEM_QUEUE = defaultdict(lambda: deque())
 
 
 class Backend(BaseBackend):
-    def __init__(self, app=None, namespace=None, *args, **kwargs):
+    def __init__(self, app, namespace, *args, **kwargs):
         self.app = app
         self.namespace = namespace
         self.namespace_id = uuid.uuid5(uuid.NAMESPACE_DNS, app + namespace).hex
@@ -52,11 +52,16 @@ class Backend(BaseBackend):
         job = INMEM_STORAGE.get(job_id)
         return job
 
-    def get_next_job(self):
-        return self.get_job(self.queue[0])
+    def get_next_scheduled_job(self):
+        try:
+            job = self.get_job(self.queue[0])
+        except IndexError:
+            job = None
+
+        return job
 
     def get_scheduled_jobs(self):
-        return [self.get_job(id) for id in INMEM_QUEUE[self.namespace_id]]
+        return [self.get_job(jid) for jid in INMEM_QUEUE[self.namespace_id]]
 
     def get_job(self, job_id):
         job = self._get_job_nocopy(job_id)
@@ -70,6 +75,19 @@ class Backend(BaseBackend):
         for j_id in scheduled_ids:
             INMEM_STORAGE.pop(j_id)
         self.queue.clear()
+
+    def update_job_progress(self, job_id, progress):
+        job = self._get_job_nocopy(job_id)
+        job.progress = progress
+
+        return job_id
+
+    def mark_job_as_running(self, job_id):
+        job = self._get_job_nocopy(job_id)
+        job.state = Job.State.RUNNING
+
+        # Remove job from queue
+        self.queue.remove(job_id)
 
     def complete_job(self, job_id):
         job = self._get_job_nocopy(job_id)

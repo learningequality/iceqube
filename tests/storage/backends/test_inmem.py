@@ -1,4 +1,5 @@
 import pytest
+
 from barbequeue.common.classes import Job
 from barbequeue.storage.backends import inmem
 
@@ -57,7 +58,7 @@ class TestBackend:
         job1_id = defaultbackend.schedule_job(job1)
         defaultbackend.schedule_job(job2)
 
-        assert defaultbackend.get_next_job().job_id == job1_id
+        assert defaultbackend.get_next_scheduled_job().job_id == job1_id
 
     def test_can_complete_job(self, defaultbackend, simplejob):
         """

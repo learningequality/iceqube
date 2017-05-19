@@ -13,7 +13,7 @@ class BaseBackend(object):
         pass
 
     @abc.abstractmethod
-    def get_next_job(self):
+    def get_next_scheduled_job(self):
         pass
 
     @abc.abstractmethod

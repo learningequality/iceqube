@@ -1,17 +1,19 @@
 import logging
 import queue
+import traceback
 from threading import Event, Thread
 
 from barbequeue import humanhash
-from barbequeue.common.classes import BaseCloseableThread
+from barbequeue.common.classes import BaseCloseableThread, Job
 from barbequeue.messaging.backends.inmem import Backend as MsgBackend
 from barbequeue.messaging.classes import MessageType, UnknownMessageError, Message
+from barbequeue.scheduler.classes import Scheduler
 
 
 class Backend(object):
-    def __init__(self, mailbox, num_threads=3, *args, **kwargs):
-        self.mailbox = mailbox
-        self.jobqueue = queue.Queue()
+    def __init__(self, incoming_message_mailbox, num_threads=3, *args, **kwargs):
+        self.incoming_message_mailbox = incoming_message_mailbox
+        self.jobqueue = queue.Queue(maxsize=num_threads)
         self.reportqueue = queue.Queue()
         self.msgbackend = MsgBackend()
         self.worker_threads = []
@@ -29,7 +31,7 @@ class Backend(object):
             parent=self,
             jobqueue=self.jobqueue,
             msgbackend=self.msgbackend,
-            mailbox=self.mailbox,
+            mailbox=self.incoming_message_mailbox,
             shutdownevent=self.monitor_shutdown_event)
         self.monitor_thread.start()
 
@@ -63,7 +65,8 @@ class MonitorThread(BaseCloseableThread):
         self.parent = parent
         self.jobqueue = jobqueue
         self.msgbackend = msgbackend
-        self.mailbox = mailbox
+        self.incoming_mailbox = mailbox
+        self.outgoing_mailbox = Scheduler.INCOMING_MESSAGES_MAILBOX
 
         super(MonitorThread, self).__init__(shutdown_event=shutdownevent, thread_name="MONITOR", *args, **kwargs)
 
@@ -75,7 +78,7 @@ class MonitorThread(BaseCloseableThread):
             pass
 
     def recv(self, timeout=0.2):
-        return self.msgbackend.pop(self.mailbox, timeout=timeout)
+        return self.msgbackend.pop(self.incoming_mailbox, timeout=timeout)
 
     def handle_message(self, msg):
         if msg.type == MessageType.START_JOB:
@@ -88,11 +91,6 @@ class MonitorThread(BaseCloseableThread):
 
     def start_job(self, job):
         self.jobqueue.put(job)
-
-    @staticmethod
-    def _generate_thread_id():
-        id, hex = humanhash.uuid()
-        return id
 
 
 class WorkerThread(Thread):
@@ -133,14 +131,22 @@ class WorkerThread(Thread):
             ret = func()
             self._notify_success(job)
         except Exception as e:
-            self.alert_parent_of_error(job, e)
+            self.report_error(job, e)
         finally:
             self.jobqueue.task_done()
 
-    def alert_parent_of_error(self, job, e):
+    def report_error(self, job, e):
         self.logger.warning(
             "Got exception for job {}: {}".format(job.job_id, e))
-        pass
+
+        # update job status
+        job.state = Job.State.FAILED
+        job.traceback = traceback.format_exc()
+        job.exception = str(e)
+
+        msg = Message(type=MessageType.JOB_FAILED,
+                      message={'job': job, 'traceback': job.traceback, 'exception': job.exception})
+        self.parent.reportqueue.put(msg)
 
     def _notify_success(self, job):
         msg = Message(type=MessageType.JOB_COMPLETED, message={'job': job})
