@@ -1,11 +1,20 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from __future__ import absolute_import, print_function, unicode_literals
+from __future__ import absolute_import, print_function
 
 import logging
+import os
 import sys
 
-from setuptools import setup
+from setuptools import find_packages, setup
+
+
+sys.path.append(
+    os.path.join(os.path.dirname(__file__), 'src')
+)
+
+# noqa
+from barbequeue import __version__  # isort:skip  # noqa
 
 
 def read_file(fname):
@@ -47,28 +56,18 @@ def enable_log_to_stdout(logname):
 
 setup(
     name=dist_name,
-    version="0.0.1",
+    version=__version__,
     description=description,
-    long_description="{readme}".format(
-        readme=readme, ),
+    long_description="{readme}".format(readme=readme),
     author='Learning Equality',
     author_email='aron+barbequeue@learningequality.org',
     url='https://github.com/learningequality/barbequeue',
-    packages=[
-        str('barbequeue'),
-        str('barbequeue.scheduler'),
-        str('barbequeue.common'),
-        str('barbequeue.storage.backends'),
-        str('barbequeue.messaging'),
-        str('barbequeue.messaging.backends'),
-        str('barbequeue.worker'),
-        str('barbequeue.worker.backends'),
-    ],
-    package_dir={'barbequeue': 'src/barbequeue'},
+    packages=find_packages('src'),
+    package_dir={'': 'src'},
     include_package_data=True,
     license='MIT',
     zip_safe=False,
-    keywords='queue',
+    keywords=('queue', 'async'),
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
         'Intended Audience :: Developers',
@@ -82,4 +81,5 @@ setup(
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: Implementation :: PyPy',
-    ], )
+    ],
+)
