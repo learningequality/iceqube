@@ -75,12 +75,22 @@ class TestClient(object):
         #  messaging backend.
         try:
             inmem_client._messaging.wait(mailbox=inmem_client.scheduler_mailbox_name, timeout=2)
+            inmem_client._messaging._wait_until_messages_processed()
         except queue.Empty:
             # Maybe it's been processed already... just continue anyway then.
             pass
 
         job = inmem_client.status(job_id)
         assert job.state == Job.State.COMPLETED
+
+    def test_schedule_can_run_n_functions(self, inmem_client):
+        n = 10
+        events = [Event() for _ in range(n)]
+        for e in events:
+            inmem_client.schedule(set_flag, e)
+
+        for e in events:
+            assert e.wait(timeout=3)
 
     def test_stringify_func_is_importable(self, client):
         funcstring = client.stringify_func(set_flag)
