@@ -8,7 +8,6 @@ import sys
 
 from setuptools import find_packages, setup
 
-
 sys.path.append(
     os.path.join(os.path.dirname(__file__), 'src')
 )
@@ -16,12 +15,13 @@ sys.path.append(
 # noqa
 from barbequeue import __version__  # isort:skip  # noqa
 
+IS_PYTHON_2 = sys.version_info < (3,)
 
 def read_file(fname):
     """
     Read file and decode in py2k
     """
-    if sys.version_info < (3,):
+    if IS_PYTHON_2:
         return open(fname).read().decode("utf-8")
     return open(fname).read()
 
@@ -32,11 +32,6 @@ readme = "Empty for now."  # read_file('README.rst')
 
 # Default description of the distributed package
 description = ("""A queueing library with support for Windows and Unix.""")
-
-
-######################################
-# STATIC AND DYNAMIC BUILD SPECIFICS #
-######################################
 
 
 def enable_log_to_stdout(logname):
@@ -54,6 +49,12 @@ def enable_log_to_stdout(logname):
     log.addHandler(ch)
 
 
+PYTHON_2_BACKPORTS = [
+    "futures>=3.1.1",
+]
+
+INSTALL_REQUIRES = PYTHON_2_BACKPORTS if IS_PYTHON_2 else []
+
 setup(
     name=dist_name,
     version=__version__,
@@ -67,6 +68,7 @@ setup(
     include_package_data=True,
     license='MIT',
     zip_safe=False,
+    install_requires=INSTALL_REQUIRES,
     keywords=('queue', 'async'),
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
