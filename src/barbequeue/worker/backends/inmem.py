@@ -13,7 +13,8 @@ class Backend(object):
     def __init__(self, incoming_message_mailbox, outgoing_message_mailbox, num_threads=3, *args, **kwargs):
         self.incoming_message_mailbox = incoming_message_mailbox
         self.outgoing_message_mailbox = outgoing_message_mailbox
-        self.jobqueue = queue.Queue(maxsize=num_threads)
+        # self.jobqueue = queue.Queue(maxsize=num_threads)
+        self.jobqueue = queue.Queue()
         self.reportqueue = queue.Queue()
         self.msgbackend = MsgBackend()
         self.worker_threads = []
