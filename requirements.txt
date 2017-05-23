@@ -6,4 +6,5 @@ py==1.4.33
 pyparsing==2.2.0
 pytest==3.0.7
 pytest-mock==1.6.0
+pytest-cov
 six==1.10.0
