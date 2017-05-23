@@ -1,3 +1,4 @@
+import time
 from queue import Full, Empty
 from threading import Event
 
@@ -6,7 +7,6 @@ from barbequeue.messaging.classes import MessageType
 
 
 class Scheduler(object):
-    INCOMING_MESSAGES_MAILBOX = "scheduler-incoming"
 
     def __init__(self, storage_backend, messaging_backend, worker_backend, incoming_mailbox, worker_mailbox):
         # TODO: Extend the scheduler module to use the messaging backend,
@@ -29,13 +29,15 @@ class Scheduler(object):
         self.scheduler_thread = SchedulerThread(worker_queue=self.worker_queue,
                                                 messaging_backend=self.messaging_backend,
                                                 storage_backend=self.storage_backend,
-                                                incoming_message_mailbox=self.INCOMING_MESSAGES_MAILBOX,
+                                                incoming_message_mailbox=self.incoming_mailbox,
                                                 shutdown_event=self.scheduler_shutdown_event, thread_name="SCHEDULER")
         self.scheduler_thread.setDaemon(True)
         self.scheduler_thread.start()
 
-    def shutdown(self):
+    def shutdown(self, wait=True):
         self.scheduler_shutdown_event.set()
+        if wait:
+            self.scheduler_thread.join()
 
 
 class SchedulerThread(BaseCloseableThread):
@@ -60,7 +62,8 @@ class SchedulerThread(BaseCloseableThread):
         if msg.type == MessageType.JOB_UPDATED:
             pass
         elif msg.type == MessageType.JOB_COMPLETED:
-            pass
+            job = msg.message['job']
+            self.storage_backend.complete_job(job.job_id)
         elif msg.type == MessageType.JOB_FAILED:
             pass
         else:
@@ -78,3 +81,15 @@ class SchedulerThread(BaseCloseableThread):
         except Full:
             self.logger.debug("Worker queue full; skipping scheduling of job {} for now.".format(next_job.job_id))
             return
+
+    def _wait_until_messages_processed(self):
+        """
+        Dangerous! Only use this during tests. Only returns when all the messages in the incoming_message_mailbox
+        drop to zero.
+        :return: 
+        """
+
+        sleep_increment = 0.2
+
+        while self.messaging_backend.count(self.incoming_message_mailbox) > 0:
+            time.sleep(sleep_increment)

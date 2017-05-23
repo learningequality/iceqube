@@ -7,12 +7,12 @@ from barbequeue import humanhash
 from barbequeue.common.classes import BaseCloseableThread, Job
 from barbequeue.messaging.backends.inmem import Backend as MsgBackend
 from barbequeue.messaging.classes import MessageType, UnknownMessageError, Message
-from barbequeue.scheduler.classes import Scheduler
 
 
 class Backend(object):
-    def __init__(self, incoming_message_mailbox, num_threads=3, *args, **kwargs):
+    def __init__(self, incoming_message_mailbox, outgoing_message_mailbox, num_threads=3, *args, **kwargs):
         self.incoming_message_mailbox = incoming_message_mailbox
+        self.outgoing_message_mailbox = outgoing_message_mailbox
         self.jobqueue = queue.Queue(maxsize=num_threads)
         self.reportqueue = queue.Queue()
         self.msgbackend = MsgBackend()
@@ -30,8 +30,10 @@ class Backend(object):
         self.monitor_thread = MonitorThread(
             parent=self,
             jobqueue=self.jobqueue,
+            reportqueue=self.reportqueue,
             msgbackend=self.msgbackend,
-            mailbox=self.incoming_message_mailbox,
+            incoming_mailbox=self.incoming_message_mailbox,
+            outgoing_mailbox=self.outgoing_message_mailbox,
             shutdownevent=self.monitor_shutdown_event)
         self.monitor_thread.start()
 
@@ -54,33 +56,49 @@ class Backend(object):
         Thread's self.start_job command."""
         self.monitor_thread.start_job(job)
 
-    def shutdown(self):
+    def shutdown(self, wait=True):
         self.monitor_shutdown_event.set()
         self.worker_shutdown_event.set()
 
+        if wait:
+            self.monitor_thread.join()
+
+            for worker in self.worker_threads:
+                worker.join()
+
 
 class MonitorThread(BaseCloseableThread):
-    def __init__(self, parent, jobqueue, msgbackend, mailbox, shutdownevent,
+    def __init__(self, parent, jobqueue, reportqueue, msgbackend, incoming_mailbox, outgoing_mailbox, shutdownevent,
                  *args, **kwargs):
         self.parent = parent
         self.jobqueue = jobqueue
+        self.reportqueue = reportqueue
         self.msgbackend = msgbackend
-        self.incoming_mailbox = mailbox
-        self.outgoing_mailbox = Scheduler.INCOMING_MESSAGES_MAILBOX
+        self.incoming_mailbox = incoming_mailbox
+        self.outgoing_mailbox = outgoing_mailbox
 
         super(MonitorThread, self).__init__(shutdown_event=shutdownevent, thread_name="MONITOR", *args, **kwargs)
 
     def main_loop(self, timeout):
+        self.receive_incoming_messages(timeout)
+        self.send_outgoing_messages(timeout)
+
+    def send_outgoing_messages(self, timeout):
+        # handle outgoing messages to send
         try:
-            msg = self.recv(timeout=timeout)
-            self.handle_message(msg)
+            msg = self.reportqueue.get(block=True, timeout=timeout)
+            self.msgbackend.send(self.outgoing_mailbox, msg)
         except queue.Empty:
             pass
 
-    def recv(self, timeout=0.2):
-        return self.msgbackend.pop(self.incoming_mailbox, timeout=timeout)
+    def receive_incoming_messages(self, timeout):
+        try:
+            msg = self.msgbackend.pop(self.incoming_mailbox, timeout=timeout)
+            self.handle_incoming_message(msg)
+        except queue.Empty:
+            pass
 
-    def handle_message(self, msg):
+    def handle_incoming_message(self, msg):
         if msg.type == MessageType.START_JOB:
             job = msg.message['job']
             self.start_job(job)
@@ -129,11 +147,20 @@ class WorkerThread(Thread):
         self.logger.info("Executing job {}".format(job.job_id))
         try:
             ret = func()
-            self._notify_success(job)
+            self.report_success(job, ret)
         except Exception as e:
             self.report_error(job, e)
-        finally:
-            self.jobqueue.task_done()
+
+    def report_success(self, job, return_value):
+        self.logger.info("Job {} ran to completion.".format(job.job_id))
+        self.jobqueue.task_done()
+
+        # update job status
+        job.state = Job.State.COMPLETED
+        job.return_value = return_value
+
+        msg = Message(type=MessageType.JOB_COMPLETED, message={'job': job, 'return_value': job.return_value})
+        self.parent.reportqueue.put(msg)
 
     def report_error(self, job, e):
         self.logger.warning(
@@ -147,10 +174,6 @@ class WorkerThread(Thread):
         msg = Message(type=MessageType.JOB_FAILED,
                       message={'job': job, 'traceback': job.traceback, 'exception': job.exception})
         self.parent.reportqueue.put(msg)
-
-    def _notify_success(self, job):
-        msg = Message(type=MessageType.JOB_COMPLETED, message={'job': job})
-        self.reportqueue.put(msg)
 
     @staticmethod
     def _generate_thread_id():

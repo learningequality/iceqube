@@ -79,7 +79,8 @@ class InMemClient(Client):
 
         self._storage = storage_inmem.Backend(app, namespace)
         self._messaging = messaging_inmem.Backend()
-        self._workers = inmem.Backend(incoming_message_mailbox=self.worker_mailbox_name)
+        self._workers = inmem.Backend(incoming_message_mailbox=self.worker_mailbox_name,
+                                      outgoing_message_mailbox=self.scheduler_mailbox_name)
         self._scheduler = Scheduler(self._storage, self._messaging, self._workers,
                                     worker_mailbox=self.worker_mailbox_name,
                                     incoming_mailbox=self.scheduler_mailbox_name)

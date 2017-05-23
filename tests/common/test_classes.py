@@ -1,3 +1,4 @@
+import queue
 from threading import Event
 
 import pytest
@@ -64,10 +65,22 @@ class TestClient(object):
         assert backend.get_job(job_id)
 
     def test_schedule_runs_function(self, inmem_client, flag):
-        inmem_client.schedule(set_flag, flag)
+        job_id = inmem_client.schedule(set_flag, flag)
 
         flag.wait(timeout=5)
         assert flag.is_set()
+
+        # NOTE: Testing threaded code is not fun.
+        # wait until we've received a new message in our inmem client
+        #  messaging backend.
+        try:
+            inmem_client._messaging.wait(mailbox=inmem_client.scheduler_mailbox_name, timeout=2)
+        except queue.Empty:
+            # Maybe it's been processed already... just continue anyway then.
+            pass
+
+        job = inmem_client.status(job_id)
+        assert job.state == Job.State.COMPLETED
 
     def test_stringify_func_is_importable(self, client):
         funcstring = client.stringify_func(set_flag)

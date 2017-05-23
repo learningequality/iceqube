@@ -74,7 +74,9 @@ class BaseCloseableThread(threading.Thread):
         self.logger = logging.getLogger("{module}.{name}[{id}]".format(module=__name__,
                                                                        name=self.thread_name,
                                                                        id=self.thread_id))
-        super(BaseCloseableThread, self).__init__(*args, **kwargs)
+        self.full_thread_name = "{thread_name}-{thread_id}".format(thread_name=self.thread_name,
+                                                                   thread_id=self.thread_id)
+        super(BaseCloseableThread, self).__init__(name=self.full_thread_name, *args, **kwargs)
 
     def run(self):
         self.logger.info("Started new {name} thread ID#{id}".format(name=self.thread_name,

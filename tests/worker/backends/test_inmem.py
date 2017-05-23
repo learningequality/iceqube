@@ -12,7 +12,7 @@ def mailbox():
 
 @pytest.fixture
 def worker(mailbox):
-    b = inmem.Backend(incoming_message_mailbox=mailbox)
+    b = inmem.Backend(incoming_message_mailbox=mailbox, outgoing_message_mailbox=mailbox)
     yield b
     b.shutdown()
 
@@ -59,18 +59,8 @@ class TestWorker:
 class TestMonitor:
     def test_handle_messages_start_message_starts_a_job(self, worker, startmsg, job, mocker):
         mocker.spy(worker.monitor_thread, 'start_job')
-        worker.monitor_thread.handle_message(startmsg)
+        worker.monitor_thread.handle_incoming_message(startmsg)
 
         start_job = worker.monitor_thread.start_job
         assert start_job.call_count == 1
         assert startmsg.message['job'] in start_job.call_args[0]
-
-    def test_recv_reads_from_messaging_backend(self, worker, startmsg, mocker,
-                                               mailbox):
-        # we assume that monitor.recv mostly looks at the pop method.
-        mocker.spy(worker.msgbackend, 'pop')
-        worker.msgbackend.send(mailbox, startmsg)
-
-        worker.monitor_thread.recv()
-
-        assert worker.msgbackend.pop.call_count == 1
