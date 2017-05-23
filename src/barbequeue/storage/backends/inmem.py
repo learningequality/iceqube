@@ -86,9 +86,6 @@ class Backend(BaseBackend):
         job = self._get_job_nocopy(job_id)
         job.state = Job.State.RUNNING
 
-        # Remove job from queue
-        self.queue.remove(job_id)
-
     def complete_job(self, job_id):
         job = self._get_job_nocopy(job_id)
 
