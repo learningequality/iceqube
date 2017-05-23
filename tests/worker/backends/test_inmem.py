@@ -1,7 +1,9 @@
+from threading import Event
+
 import pytest
 
 from barbequeue.common.classes import Job
-from barbequeue.messaging.classes import Message, MessageType
+from barbequeue.messaging.backends.inmem import Backend
 from barbequeue.worker.backends import inmem
 
 
@@ -9,58 +11,32 @@ from barbequeue.worker.backends import inmem
 def mailbox():
     return "pytest"
 
+@pytest.fixture
+def msgbackend():
+    return Backend()
+
 
 @pytest.fixture
-def worker(mailbox):
-    b = inmem.Backend(incoming_message_mailbox=mailbox, outgoing_message_mailbox=mailbox)
+def worker(mailbox, msgbackend):
+    b = inmem.Backend(incoming_message_mailbox=mailbox, outgoing_message_mailbox=mailbox, msgbackend=msgbackend)
     yield b
     b.shutdown()
 
-
 @pytest.fixture
-def startmsg(job):
-    msg = Message(type=MessageType.START_JOB, message={"job": job})
-    return msg
+def flag():
+    e = Event()
+    yield e
+    e.clear()
 
 
-@pytest.fixture
-def simplejob():
-    job = Job("builtins.id", 'test', job_id='simplejob')
-    return job
-
-
-ID_SET = None
-
-
-def testfunc(val=None):
-    global ID_SET
-    ID_SET = val
-
-
-@pytest.fixture
-def job():
-    global ID_SET
-    test_func_name = "{module}.{func}".format(module=__name__, func="testfunc")
-    yield Job(test_func_name, job_id="test", val="passme")
-    ID_SET = None  # reset the value set by testfunc
+def set_flag(threading_flag):
+    threading_flag.set()
 
 
 class TestWorker:
-    def test_successful_job_adds_to_report_queue(self, worker, simplejob, mocker):
-        mocker.spy(worker.reportqueue, 'put')
+    def test_schedule_job_runs_job(self, worker, flag):
+        job = Job(set_flag.__name__)
+        worker.schedule_job(job)
 
-        worker.start_job(simplejob)
-        worker.jobqueue.join()
-
-        assert worker.reportqueue.put.call_count == 1
-        assert simplejob == worker.reportqueue.put.call_args[0][0].message.get('job')
-
-
-class TestMonitor:
-    def test_handle_messages_start_message_starts_a_job(self, worker, startmsg, job, mocker):
-        mocker.spy(worker.monitor_thread, 'start_job')
-        worker.monitor_thread.handle_incoming_message(startmsg)
-
-        start_job = worker.monitor_thread.start_job
-        assert start_job.call_count == 1
-        assert startmsg.message['job'] in start_job.call_args[0]
+        assert False
+        assert flag.wait()

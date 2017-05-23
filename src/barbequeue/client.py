@@ -1,4 +1,3 @@
-import importlib
 import uuid
 
 from barbequeue.common.classes import Job
@@ -13,20 +12,20 @@ class Client(object):
         self.storage_backend_module = config['storage_backend']
         self.storage = self.storage_backend_module.Backend(app, namespace)
 
-    def schedule(self, func, *args, **kwargs):
+    def schedule(self, funcstring, *args, **kwargs):
         """
         Schedules a function func for execution.
         """
 
         updates_progress = kwargs.pop('updates_progress', False)
 
-        # turn our function object into its fully qualified name if needed
-        if callable(func):
-            funcname = self.stringify_func(func)
+        # if the funcstring is already a job object, just schedule that directly.
+        if isinstance(funcstring, Job):
+            job = funcstring
+        # else, turn it into a job first.
         else:
-            funcname = func
+            job = Job(funcstring, *args, **kwargs)
 
-        job = Job(funcname, *args, **kwargs)
         job_id = self.storage.schedule_job(job)
         return job_id
 
@@ -42,24 +41,6 @@ class Client(object):
         Gets the status of a job given by job_id.
         """
         return self.storage.get_job(job_id)
-
-    @staticmethod
-    def stringify_func(func):
-        assert callable(func), "function {} passed to stringify_func isn't a function!".format(func)
-
-        fqn = "{module}.{funcname}".format(module=func.__module__, funcname=func.__name__)
-        return fqn
-
-    @staticmethod
-    def import_stringified_func(funcstring):
-        assert isinstance(funcstring, str)
-
-        modulestring, funcname = funcstring.rsplit('.', 1)
-
-        mod = importlib.import_module(modulestring)
-
-        func = getattr(mod, funcname)
-        return func
 
 
 class InMemClient(Client):
@@ -80,8 +61,9 @@ class InMemClient(Client):
         self._storage = storage_inmem.Backend(app, namespace)
         self._messaging = messaging_inmem.Backend()
         self._workers = inmem.Backend(incoming_message_mailbox=self.worker_mailbox_name,
-                                      outgoing_message_mailbox=self.scheduler_mailbox_name)
-        self._scheduler = Scheduler(self._storage, self._messaging, self._workers,
+                                      outgoing_message_mailbox=self.scheduler_mailbox_name,
+                                      msgbackend=self._messaging)
+        self._scheduler = Scheduler(self._storage, self._messaging,
                                     worker_mailbox=self.worker_mailbox_name,
                                     incoming_mailbox=self.scheduler_mailbox_name)
 

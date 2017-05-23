@@ -1,6 +1,7 @@
 import pytest
 
 from barbequeue.common.classes import Job
+from barbequeue.common.utils import stringify_func
 from barbequeue.storage.backends import inmem
 
 
@@ -28,7 +29,7 @@ class TestBackend:
         new_job = defaultbackend.get_job(job_id)
 
         # Does the returned job record the function we set to run?
-        assert str(new_job.func) == str(id)
+        assert str(new_job.func) == stringify_func(id)
 
         # Does the job have the right state (SCHEDULED)?
         assert new_job.state == Job.State.SCHEDULED

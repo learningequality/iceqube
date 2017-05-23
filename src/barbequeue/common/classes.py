@@ -1,11 +1,11 @@
 import abc
 import enum
-import importlib
 import logging
 import threading
 from collections import namedtuple
 
 from barbequeue import humanhash
+from barbequeue.common.utils import stringify_func, import_stringified_func
 
 logger = logging.getLogger(__name__)
 
@@ -19,25 +19,27 @@ class Job(object):
         CANCELED = 4
         COMPLETED = 5
 
-    def __init__(self, func_string, *args, **kwargs):
+    def __init__(self, func, *args, **kwargs):
         self.job_id = kwargs.pop('job_id', None)
         self.state = kwargs.pop('state', self.State.SCHEDULED)
-        self.func = func_string
         self.traceback = kwargs.pop('traceback', '')
         self.exception = kwargs.pop('exception', '')
         self.args = args
         self.kwargs = kwargs
 
-    def get_lambda_to_execute(self):
-        fqn = self.func
-        modulename, funcname = fqn.rsplit('.', 1)
-        mod = importlib.import_module(modulename)
-        assert hasattr(
-            mod, funcname), \
-            "Module {} does not have attribute {}".format(
-                mod, funcname)
+        if callable(func):
+            funcstring = stringify_func(func)
+        elif isinstance(func, str):
+            funcstring = func
+        else:
+            raise Exception(
+                "Error in creating job. We do not know how to "
+                "handle a function of type {}".format(type(func)))
 
-        func = getattr(mod, funcname)
+        self.func = funcstring
+
+    def get_lambda_to_execute(self):
+        func = import_stringified_func(self.func)
 
         y = lambda: func(*self.args, **self.kwargs)
         return y

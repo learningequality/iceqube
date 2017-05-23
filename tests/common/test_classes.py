@@ -5,6 +5,7 @@ import pytest
 
 from barbequeue.client import Client, InMemClient
 from barbequeue.common.classes import Job
+from barbequeue.common.utils import stringify_func, import_stringified_func
 from barbequeue.storage.backends import inmem
 from barbequeue.worker.backends import inmem as worker_inmem
 
@@ -90,11 +91,11 @@ class TestClient(object):
             inmem_client.schedule(set_flag, e)
 
         for e in events:
-            assert e.wait(timeout=3)
+            assert e.wait(timeout=1)
 
     def test_stringify_func_is_importable(self, client):
-        funcstring = client.stringify_func(set_flag)
-        func = client.import_stringified_func(funcstring)
+        funcstring = stringify_func(set_flag)
+        func = import_stringified_func(funcstring)
 
         assert set_flag == func
 
