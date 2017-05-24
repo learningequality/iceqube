@@ -2,7 +2,7 @@ import logging
 import time
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
-from queue import Queue, Empty
+from queue import Empty, Queue
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ class BaseBackend(object):
         pass
 
     @abstractmethod
-    def pop(self, mailbox):
+    def pop(self, mailbox, timeout=None):
         pass
 
     @abstractmethod
