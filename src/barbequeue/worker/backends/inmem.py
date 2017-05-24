@@ -1,6 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
 
-from barbequeue.messaging.classes import SuccessMessage
 from barbequeue.worker.backends.base import BaseBackend
 
 
@@ -33,6 +32,7 @@ class Backend(BaseBackend):
         return ThreadPoolExecutor(max_workers=num_workers)
 
     def handle_finished_future(self, future):
+        # get back the job assigned to the future
         job = self.job_future_mapping[future]
 
         try:
@@ -42,10 +42,6 @@ class Backend(BaseBackend):
             return
 
         self.report_success(job, result)
-
-    def report_success(self, job, result):
-        msg = SuccessMessage(job.job_id, result)
-        self.msgbackend.send(self.outgoing_message_mailbox, msg)
 
 
 class Reporter(object):

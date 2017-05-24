@@ -1,4 +1,7 @@
-from abc import abstractmethod, ABCMeta
+from abc import ABCMeta, abstractmethod
+
+from barbequeue.common.utils import InfiniteLoopThread
+from barbequeue.messaging.classes import MessageType, SuccessMessage
 
 
 class BaseBackend(object):
@@ -10,6 +13,7 @@ class BaseBackend(object):
         self.msgbackend = msgbackend
 
         self.workers = self.start_workers(num_workers=num_workers)
+        self.message_processor = self.start_message_processing()
 
     @abstractmethod
     def schedule_job(self, job):
@@ -23,3 +27,25 @@ class BaseBackend(object):
     @abstractmethod
     def shutdown(self, wait):
         pass
+
+    def start_message_processing(self):
+        t = InfiniteLoopThread(self.process_messages, thread_name="MESSAGEPROCESSOR", wait_between_runs=0.5)
+        t.start()
+        return t
+
+    def process_messages(self):
+        msg = self.msgbackend.pop(self.incoming_message_mailbox)
+        self.handle_incoming_message(msg)
+
+    def handle_incoming_message(self, msg):
+        if msg.type == MessageType.START_JOB:
+            job = msg.message['job']
+            self.schedule_job(job)
+        elif msg.type == MessageType.CANCEL_JOB:
+            pass
+        else:
+            raise Exception("Unrecognized message {}".format(msg))
+
+    def report_success(self, job, result):
+        msg = SuccessMessage(job.job_id, result)
+        self.msgbackend.send(self.outgoing_message_mailbox, msg)
