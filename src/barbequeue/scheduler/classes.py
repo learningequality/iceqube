@@ -1,9 +1,9 @@
 import time
-from queue import Full, Empty
+from queue import Empty, Full
 from threading import Event
 
 from barbequeue.common.utils import BaseCloseableThread
-from barbequeue.messaging.classes import MessageType, Message
+from barbequeue.messaging.classes import Message, MessageType
 
 
 class Scheduler(object):
@@ -55,8 +55,8 @@ class SchedulerThread(BaseCloseableThread):
         if msg.type == MessageType.JOB_UPDATED:
             pass
         elif msg.type == MessageType.JOB_COMPLETED:
-            job = msg.message['job']
-            self.storage_backend.complete_job(job.job_id)
+            job_id = msg.message['job_id']
+            self.storage_backend.complete_job(job_id)
         elif msg.type == MessageType.JOB_FAILED:
             pass
         else:

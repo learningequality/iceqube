@@ -5,7 +5,7 @@ import pytest
 
 from barbequeue.client import Client, InMemClient
 from barbequeue.common.classes import Job
-from barbequeue.common.utils import stringify_func, import_stringified_func
+from barbequeue.common.utils import import_stringified_func, stringify_func
 from barbequeue.storage.backends import inmem
 from barbequeue.worker.backends import inmem as worker_inmem
 
@@ -76,7 +76,6 @@ class TestClient(object):
         #  messaging backend.
         try:
             inmem_client._messaging.wait(mailbox=inmem_client.scheduler_mailbox_name, timeout=2)
-            inmem_client._messaging._wait_until_messages_processed()
         except queue.Empty:
             # Maybe it's been processed already... just continue anyway then.
             pass
