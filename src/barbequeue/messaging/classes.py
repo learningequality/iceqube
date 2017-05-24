@@ -1,6 +1,5 @@
 import enum
 import json
-import logging
 from collections import namedtuple
 
 
@@ -28,3 +27,10 @@ class Message(namedtuple("_Message", ["type", "message"])):
         ), "Message type not found in predetermined message type list!"
 
         return json.dumps({"type": self.type, "messsage": self.message})
+
+
+class SuccessMessage(Message):
+    def __new__(cls, job_id, result):
+        msg = {'job_id': job_id, 'result': result}
+        self = super(SuccessMessage, cls).__new__(cls, type=MessageType.JOB_COMPLETED, message=msg)
+        return self
