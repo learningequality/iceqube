@@ -2,7 +2,7 @@ import time
 from queue import Full, Empty
 from threading import Event
 
-from barbequeue.common.classes import BaseCloseableThread
+from barbequeue.common.utils import BaseCloseableThread
 from barbequeue.messaging.classes import MessageType, Message
 
 
