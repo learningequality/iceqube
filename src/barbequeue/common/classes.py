@@ -35,10 +35,25 @@ class Job(object):
 
         self.func = funcstring
 
-    def get_lambda_to_execute(self):
+    def get_lambda_to_execute(self, progress_updates=False):
+        """
+        return a function that executes the function assigned to this job.
+        
+        If progress_updates is False (the default), the returned function accepts no argument
+        and simply needs to be called. If progress_updates is True, an update_progress function
+        is passed in that can be used by the function to provide feedback progress back to the
+        job scheduling system.
+        
+        :param progress_updates: If True, returns a function with one required parameter.
+        :return: a function that executes the original function assigned to this job.
+        """
         func = import_stringified_func(self.func)
 
-        y = lambda: func(*self.args, **self.kwargs)
+        if progress_updates:
+            y = lambda p: func(update_progress=progress_updates, *self.args, **self.kwargs)
+        else:
+            y = lambda: func(*self.args, **self.kwargs)
+
         return y
 
     def __repr__(self):
