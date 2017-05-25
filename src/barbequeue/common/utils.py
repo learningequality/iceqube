@@ -102,8 +102,9 @@ class InfiniteLoopThread(BaseCloseableThread):
         try:
             self.func()
         except Exception as e:
-            self.logger.warning("Got an exception running {func}: {e}".format(func=self.func, e=e))
-            time.sleep(self.wait)
+            self.logger.warning("Got an exception running {func}: {e}".format(func=self.func, e=str(e)))
+
+        time.sleep(self.wait)
 
     def cancel(self):
         self.shutdown_event.set()
