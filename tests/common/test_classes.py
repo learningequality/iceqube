@@ -70,7 +70,12 @@ class TestClient(object):
         flag.wait(timeout=5)
         assert flag.is_set()
 
-        inmem_client._storage.wait_for_job_update(job_id, timeout=2)
+        try:
+            inmem_client._storage.wait_for_job_update(job_id, timeout=2)
+        except Exception:
+            # welp, maybe a job update happened in between that schedule call and the wait call.
+            # at least we waited!
+            pass
 
         job = inmem_client.status(job_id)
         assert job.state == Job.State.COMPLETED
