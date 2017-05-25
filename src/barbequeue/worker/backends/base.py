@@ -43,8 +43,6 @@ class BaseBackend(object):
             self.schedule_job(job)
         elif msg.type == MessageType.CANCEL_JOB:
             pass
-        else:
-            raise Exception("Unrecognized message {}".format(msg))
 
     def report_success(self, job, result):
         msg = SuccessMessage(job.job_id, result)

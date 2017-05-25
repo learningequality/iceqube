@@ -63,7 +63,7 @@ class TestBackend:
 
     def test_can_complete_job(self, defaultbackend, simplejob):
         """
-        When we call backend.finish_job, it should mark the job as finished, and
+        When we call backend.complete_job, it should mark the job as finished, and
         remove it from the queue.
         """
 
@@ -74,8 +74,3 @@ class TestBackend:
 
         # is the job marked as completed?
         assert job.state == Job.State.COMPLETED
-
-        # is the job not part of the list of scheduled jobs
-        assert job_id not in [
-            j.job_id for j in defaultbackend.get_scheduled_jobs()
-        ]

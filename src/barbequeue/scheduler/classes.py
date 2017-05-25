@@ -1,4 +1,3 @@
-import time
 from queue import Empty, Full
 from threading import Event
 
@@ -72,18 +71,7 @@ class SchedulerThread(BaseCloseableThread):
         try:
             self.messaging_backend.send(self.worker_mailbox,
                                         Message(type=MessageType.START_JOB, message={'job': next_job}))
+            self.storage_backend.mark_job_as_queued(next_job.job_id)
         except Full:
             self.logger.debug("Worker queue full; skipping scheduling of job {} for now.".format(next_job.job_id))
             return
-
-    def _wait_until_messages_processed(self):
-        """
-        Dangerous! Only use this during tests. Only returns when all the messages in the incoming_message_mailbox
-        drop to zero.
-        :return: 
-        """
-
-        sleep_increment = 0.2
-
-        while self.messaging_backend.count(self.incoming_message_mailbox) > 0:
-            time.sleep(sleep_increment)

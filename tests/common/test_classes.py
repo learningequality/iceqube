@@ -1,4 +1,3 @@
-import queue
 from threading import Event
 
 import pytest
@@ -71,14 +70,7 @@ class TestClient(object):
         flag.wait(timeout=5)
         assert flag.is_set()
 
-        # NOTE: Testing threaded code is not fun.
-        # wait until we've received a new message in our inmem client
-        #  messaging backend.
-        try:
-            inmem_client._messaging.wait(mailbox=inmem_client.scheduler_mailbox_name, timeout=2)
-        except queue.Empty:
-            # Maybe it's been processed already... just continue anyway then.
-            pass
+        inmem_client._storage.wait_for_job_update(job_id, timeout=2)
 
         job = inmem_client.status(job_id)
         assert job.state == Job.State.COMPLETED

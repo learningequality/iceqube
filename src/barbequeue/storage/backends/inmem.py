@@ -58,6 +58,7 @@ class Backend(BaseBackend):
         except IndexError:
             job = None
 
+        # logging.warning("getting job with job id {}".format(job.job_id))
         return job
 
     def get_scheduled_jobs(self):
@@ -82,6 +83,19 @@ class Backend(BaseBackend):
 
         return job_id
 
+    def mark_job_as_queued(self, job_id):
+        """
+        Change the job given by job_id to QUEUED.
+        
+        :param job_id: the job to be marked as QUEUED.
+        :return: None
+        """
+        job = self._get_job_nocopy(job_id)
+        job.state = Job.State.QUEUED
+
+        # remove the job from the job queue.
+        self.queue.remove(job_id)
+
     def mark_job_as_running(self, job_id):
         job = self._get_job_nocopy(job_id)
         job.state = Job.State.RUNNING
@@ -91,8 +105,4 @@ class Backend(BaseBackend):
 
         # mark the job as completed
         job.state = Job.State.COMPLETED
-
-        # remove the job from the job queue.
-        self.queue.remove(job_id)
-
-        # TODO: add it to the list of completed jobs.
+        self.notify_of_job_update(job_id)
