@@ -62,6 +62,9 @@ def make_job_updates(flag, update_progress):
         update_progress(i, 2)
     set_flag(flag)
 
+def failing_func():
+    raise Exception()
+
 
 class TestClient(object):
     def test_schedules_a_function(self, client, backend):
@@ -102,6 +105,15 @@ class TestClient(object):
             inmem_client._storage.wait_for_job_update(job_id, timeout=2)
             job = inmem_client.status(job_id)
             assert job.state in [Job.State.QUEUED, Job.State.RUNNING, Job.State.COMPLETED]
+
+    def test_can_get_notified_of_job_failure(self, inmem_client):
+        job_id = inmem_client.schedule(failing_func)
+
+        job = inmem_client._storage.wait_for_job_update(job_id, timeout=2)
+        assert job.state == Job.State.QUEUED
+
+        job = inmem_client._storage.wait_for_job_update(job_id, timeout=2)
+        assert job.state == Job.State.FAILED
 
     def test_stringify_func_is_importable(self, client):
         funcstring = stringify_func(set_flag)

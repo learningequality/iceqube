@@ -100,9 +100,15 @@ class Backend(BaseBackend):
         self.queue.remove(job_id)
         self.notify_of_job_update(job_id)
 
+    def mark_job_as_failed(self, job_id, exception, traceback):
+        job = self._get_job_nocopy(job_id)
+        job.state = Job.State.FAILED
+        self.notify_of_job_update(job_id)
+
     def mark_job_as_running(self, job_id):
         job = self._get_job_nocopy(job_id)
         job.state = Job.State.RUNNING
+        self.notify_of_job_update(job_id)
 
     def complete_job(self, job_id):
         job = self._get_job_nocopy(job_id)

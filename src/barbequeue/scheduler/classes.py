@@ -52,16 +52,18 @@ class SchedulerThread(BaseCloseableThread):
             return
 
         job_id = msg.message['job_id']
+        actual_msg = msg.message
 
         if msg.type == MessageType.JOB_UPDATED:
-            actual_msg = msg.message
             progress = actual_msg['progress']
             total_progress = actual_msg['total_progress']
             self.storage_backend.update_job_progress(job_id, progress, total_progress)
         elif msg.type == MessageType.JOB_COMPLETED:
             self.storage_backend.complete_job(job_id)
         elif msg.type == MessageType.JOB_FAILED:
-            pass
+            exc = actual_msg['exception']
+            trace = actual_msg['traceback']
+            self.storage_backend.mark_job_as_failed(job_id, exc, trace)
         else:
             self.logger.error("Unknown message type: {}".format(msg.type))
 
