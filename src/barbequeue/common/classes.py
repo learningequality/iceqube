@@ -2,7 +2,7 @@ import enum
 import logging
 from collections import namedtuple
 
-from barbequeue.common.utils import stringify_func, import_stringified_func
+from barbequeue.common.utils import import_stringified_func, stringify_func
 
 logger = logging.getLogger(__name__)
 
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 class Job(object):
     class State(enum.Enum):
         SCHEDULED = 0
-        # STARTED = 1
+        QUEUED = 1
         RUNNING = 2
         FAILED = 3
         CANCELED = 4
@@ -41,6 +41,10 @@ class Job(object):
         y = lambda: func(*self.args, **self.kwargs)
         return y
 
+    def __repr__(self):
+        return "Job id: {id} state: {state} func: {func}".format(id=self.job_id, state=self.state.name,
+                                                                 func=self.func)
+
     def serialize(self):
         pass
 
@@ -53,5 +57,3 @@ class Function(namedtuple("_Function", ["module", "funcname"])):
     def serialize(self):
         # Since this is all in memory, there is no need to serialize anything.
         raise NotImplementedError()
-
-
