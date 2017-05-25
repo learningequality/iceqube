@@ -38,7 +38,9 @@ class Backend(BaseBackend):
         try:
             result = future.result()
         except Exception as e:
-            self.report_error(job, e)
+            # TODO: concurrent.futures doesn't provide the stacktrace.
+            # find a way to catch the stacktrace.
+            self.report_error(job, e, "")
             return
 
         self.report_success(job, result)
