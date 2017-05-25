@@ -55,8 +55,8 @@ class BaseBackend(object):
 
         event = JOB_EVENT_MAPPING[job_id]
         event.clear()
-        job = self.get_job(job_id)
         result = event.wait(timeout=timeout)
+        job = self.get_job(job_id)
 
         if result:
             return job
