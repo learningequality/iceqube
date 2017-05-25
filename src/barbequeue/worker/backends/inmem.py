@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 
 from barbequeue.worker.backends.base import BaseBackend
 
@@ -13,11 +14,20 @@ class Backend(BaseBackend):
         super(Backend, self).__init__(*args, **kwargs)
 
     def schedule_job(self, job):
-        """Manually schedule a job given by job. A simple proxy to the Monitor
-        Thread's self.start_job command."""
+        """
+        schedule a job to the type of workers spawned by self.start_workers.
+        
+        
+        :param job: the job to schedule for running.
+        :return: 
+        """
         l = job.get_lambda_to_execute()
 
-        future = self.workers.submit(l)
+        if job.track_progress:
+            future = self.workers.submit(l, self.update_progress)
+        else:
+            future = self.workers.submit(l)
+
         # assign the futures to a dict, mapping them to a job
         self.job_future_mapping[future] = job
         # callback for when the future is now!

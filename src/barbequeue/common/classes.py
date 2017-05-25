@@ -1,6 +1,7 @@
 import enum
 import logging
 from collections import namedtuple
+from functools import partial
 
 from barbequeue.common.utils import import_stringified_func, stringify_func
 
@@ -21,6 +22,9 @@ class Job(object):
         self.state = kwargs.pop('state', self.State.SCHEDULED)
         self.traceback = kwargs.pop('traceback', '')
         self.exception = kwargs.pop('exception', '')
+        self.track_progress = kwargs.pop('track_progress', False)
+        self.progress = 0
+        self.total_progress = 0
         self.args = args
         self.kwargs = kwargs
 
@@ -35,30 +39,41 @@ class Job(object):
 
         self.func = funcstring
 
-    def get_lambda_to_execute(self, progress_updates=False):
+    def get_lambda_to_execute(self):
         """
         return a function that executes the function assigned to this job.
         
-        If progress_updates is False (the default), the returned function accepts no argument
-        and simply needs to be called. If progress_updates is True, an update_progress function
+        If job.track_progress is None (the default), the returned function accepts no argument
+        and simply needs to be called. If job.track_progress is True, an update_progress function
         is passed in that can be used by the function to provide feedback progress back to the
         job scheduling system.
         
-        :param progress_updates: If True, returns a function with one required parameter.
         :return: a function that executes the original function assigned to this job.
         """
         func = import_stringified_func(self.func)
 
-        if progress_updates:
-            y = lambda p: func(update_progress=progress_updates, *self.args, **self.kwargs)
+        if self.track_progress:
+            y = lambda p: func(update_progress=partial(p, self.job_id), *self.args, **self.kwargs)
         else:
             y = lambda: func(*self.args, **self.kwargs)
 
         return y
 
+    @property
+    def percentage_progress(self):
+        """
+        Returns a float between 0 and 1, representing the current job's progress in its task.
+        
+        :return: float corresponding to the total percentage progress of the job.
+        """
+        return float(self.progress) / self.total_progress
+
     def __repr__(self):
-        return "Job id: {id} state: {state} func: {func}".format(id=self.job_id, state=self.state.name,
-                                                                 func=self.func)
+        return "<Job id: {id} state: {state} progress: {p}/{total} func: {func}>".format(id=self.job_id,
+                                                                                         state=self.state.name,
+                                                                                         func=self.func,
+                                                                                         p=self.progress,
+                                                                                         total=self.total_progress)
 
     def serialize(self):
         pass

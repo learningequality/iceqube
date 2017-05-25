@@ -17,8 +17,6 @@ class Client(object):
         Schedules a function func for execution.
         """
 
-        updates_progress = kwargs.pop('updates_progress', False)
-
         # if the funcstring is already a job object, just schedule that directly.
         if isinstance(funcstring, Job):
             job = funcstring
@@ -26,6 +24,7 @@ class Client(object):
         else:
             job = Job(funcstring, *args, **kwargs)
 
+        job.track_progress = kwargs.pop('track_progress', False)
         job_id = self.storage.schedule_job(job)
         return job_id
 

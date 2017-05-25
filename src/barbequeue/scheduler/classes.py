@@ -51,10 +51,14 @@ class SchedulerThread(BaseCloseableThread):
             self.logger.debug("No new messages from workers.")
             return
 
+        job_id = msg.message['job_id']
+
         if msg.type == MessageType.JOB_UPDATED:
-            pass
+            actual_msg = msg.message
+            progress = actual_msg['progress']
+            total_progress = actual_msg['total_progress']
+            self.storage_backend.update_job_progress(job_id, progress, total_progress)
         elif msg.type == MessageType.JOB_COMPLETED:
-            job_id = msg.message['job_id']
             self.storage_backend.complete_job(job_id)
         elif msg.type == MessageType.JOB_FAILED:
             pass

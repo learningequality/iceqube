@@ -57,6 +57,12 @@ def set_flag(threading_flag):
     threading_flag.set()
 
 
+def make_job_updates(flag, update_progress):
+    for i in range(3):
+        update_progress(i, 2)
+    set_flag(flag)
+
+
 class TestClient(object):
     def test_schedules_a_function(self, client, backend):
         job_id = client.schedule(id)
@@ -88,6 +94,14 @@ class TestClient(object):
 
         for e in events:
             assert e.wait(timeout=1)
+
+    def test_scheduled_job_can_receive_job_updates(self, inmem_client, flag):
+        job_id = inmem_client.schedule(make_job_updates, flag, track_progress=True)
+
+        for i in range(2):
+            inmem_client._storage.wait_for_job_update(job_id, timeout=2)
+            job = inmem_client.status(job_id)
+            assert job.state in [Job.State.QUEUED, Job.State.RUNNING, Job.State.COMPLETED]
 
     def test_stringify_func_is_importable(self, client):
         funcstring = stringify_func(set_flag)

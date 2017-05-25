@@ -48,7 +48,12 @@ class BaseBackend(object):
     def report_success(self, job, result):
         msg = SuccessMessage(job.job_id, result)
         self.msgbackend.send(self.outgoing_message_mailbox, msg)
+
     def report_error(self, job, exc, trace):
         trace = traceback.format_exc()
         msg = FailureMessage(job.job_id, exc, trace)
+        self.msgbackend.send(self.outgoing_message_mailbox, msg)
+
+    def update_progress(self, job_id, progress, total_progress, stage=""):
+        msg = ProgressMessage(job_id, progress, total_progress, stage)
         self.msgbackend.send(self.outgoing_message_mailbox, msg)

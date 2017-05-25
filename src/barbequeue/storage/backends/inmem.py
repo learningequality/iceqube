@@ -77,10 +77,13 @@ class Backend(BaseBackend):
             INMEM_STORAGE.pop(j_id)
         self.queue.clear()
 
-    def update_job_progress(self, job_id, progress):
+    def update_job_progress(self, job_id, progress, total_progress):
         job = self._get_job_nocopy(job_id)
+        job.state = Job.State.RUNNING
         job.progress = progress
+        job.total_progress = total_progress
 
+        self.notify_of_job_update(job_id)
         return job_id
 
     def mark_job_as_queued(self, job_id):
@@ -95,6 +98,7 @@ class Backend(BaseBackend):
 
         # remove the job from the job queue.
         self.queue.remove(job_id)
+        self.notify_of_job_update(job_id)
 
     def mark_job_as_running(self, job_id):
         job = self._get_job_nocopy(job_id)
