@@ -42,8 +42,8 @@ class Job(object):
     def __init__(self, func, *args, **kwargs):
         self.job_id = kwargs.pop('job_id', None)
         self.state = kwargs.pop('state', self.State.SCHEDULED)
-        self.traceback = kwargs.pop('traceback', '')
-        self.exception = kwargs.pop('exception', '')
+        self.traceback = ""
+        self.exception = None
         self.track_progress = kwargs.pop('track_progress', False)
         self.progress = 0
         self.total_progress = 0
