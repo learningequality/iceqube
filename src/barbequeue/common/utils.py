@@ -106,5 +106,5 @@ class InfiniteLoopThread(BaseCloseableThread):
 
         time.sleep(self.wait)
 
-    def cancel(self):
+    def stop(self):
         self.shutdown_event.set()
