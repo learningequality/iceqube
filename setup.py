@@ -51,11 +51,16 @@ def enable_log_to_stdout(logname):
     log.addHandler(ch)
 
 
+INSTALL_REQUIRES = [
+    'six',
+    'enum34>=1.1,<2',
+]
+
 PYTHON_2_BACKPORTS = [
     "futures>=3.1.1",
 ]
 
-INSTALL_REQUIRES = PYTHON_2_BACKPORTS if IS_PYTHON_2 else []
+INSTALL_REQUIRES += PYTHON_2_BACKPORTS if IS_PYTHON_2 else []
 
 setup(
     name=dist_name,
