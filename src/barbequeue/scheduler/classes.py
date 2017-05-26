@@ -1,7 +1,8 @@
+import logging
 from queue import Empty, Full
 from threading import Event
 
-from barbequeue.common.utils import BaseCloseableThread
+from barbequeue.common.utils import InfiniteLoopThread
 from barbequeue.messaging.classes import Message, MessageType
 
 
@@ -15,40 +16,48 @@ class Scheduler(object):
 
         self.messaging_backend = messaging_backend
 
-        self.start_scheduler_thread()
+        self.start_scheduler()
+        self.start_worker_message_handler()
 
-    def start_scheduler_thread(self):
-        self.scheduler_thread = SchedulerThread(messaging_backend=self.messaging_backend,
-                                                storage_backend=self.storage_backend,
-                                                incoming_message_mailbox=self.incoming_mailbox,
-                                                worker_mailbox=self.worker_mailbox,
-                                                shutdown_event=self.scheduler_shutdown_event, thread_name="SCHEDULER")
-        self.scheduler_thread.setDaemon(True)
+    def start_scheduler(self):
+        self.scheduler_thread = InfiniteLoopThread(func=self.schedule_next_job, thread_name="SCHEDULER",
+                                                   wait_between_runs=0.5)
         self.scheduler_thread.start()
 
+    def start_worker_message_handler(self):
+        self.worker_message_handler_thread = InfiniteLoopThread(func=lambda: self.handle_worker_messages(timeout=2),
+                                                                thread_name="WORKERMESSAGEHANDLER",
+                                                                wait_between_runs=0.5)
+        self.worker_message_handler_thread.start()
+
     def shutdown(self, wait=True):
-        self.scheduler_shutdown_event.set()
+        self.scheduler_thread.stop()
+        self.worker_message_handler_thread.stop()
+
         if wait:
             self.scheduler_thread.join()
+            self.worker_message_handler_thread.join()
 
+    def schedule_next_job(self):
+        next_job = self.storage_backend.get_next_scheduled_job()
 
-class SchedulerThread(BaseCloseableThread):
-    def __init__(self, storage_backend, messaging_backend, incoming_message_mailbox, worker_mailbox, *args, **kwargs):
-        self.storage_backend = storage_backend
-        self.worker_mailbox = worker_mailbox
-        self.messaging_backend = messaging_backend
-        self.incoming_message_mailbox = incoming_message_mailbox
-        super(SchedulerThread, self).__init__(*args, **kwargs)
+        if not next_job:
+            logging.debug("No job to schedule right now.")
+            return
 
-    def main_loop(self, timeout):
-        self.schedule_next_job(timeout)
-        self.handle_worker_messages(timeout)
+        try:
+            self.messaging_backend.send(self.worker_mailbox,
+                                        Message(type=MessageType.START_JOB, message={'job': next_job}))
+            self.storage_backend.mark_job_as_queued(next_job.job_id)
+        except Full:
+            logging.debug("Worker queue full; skipping scheduling of job {} for now.".format(next_job.job_id))
+            return
 
     def handle_worker_messages(self, timeout):
         try:
-            msg = self.messaging_backend.pop(self.incoming_message_mailbox, timeout=timeout)
+            msg = self.messaging_backend.pop(self.incoming_mailbox, timeout=timeout)
         except Empty:
-            self.logger.debug("No new messages from workers.")
+            logging.debug("No new messages from workers.")
             return
 
         job_id = msg.message['job_id']
@@ -66,18 +75,3 @@ class SchedulerThread(BaseCloseableThread):
             self.storage_backend.mark_job_as_failed(job_id, exc, trace)
         else:
             self.logger.error("Unknown message type: {}".format(msg.type))
-
-    def schedule_next_job(self, timeout):
-        next_job = self.storage_backend.get_next_scheduled_job()
-
-        if not next_job:
-            self.logger.debug("No job to schedule right now.")
-            return
-
-        try:
-            self.messaging_backend.send(self.worker_mailbox,
-                                        Message(type=MessageType.START_JOB, message={'job': next_job}))
-            self.storage_backend.mark_job_as_queued(next_job.job_id)
-        except Full:
-            self.logger.debug("Worker queue full; skipping scheduling of job {} for now.".format(next_job.job_id))
-            return
