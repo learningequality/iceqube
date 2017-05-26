@@ -21,6 +21,8 @@ def read_file(fname):
     """
     Read file and decode in py2k
     """
+    # This is necessary because we cannot use unicode_literals in
+    # setup.py
     if IS_PYTHON_2:
         return open(fname).read().decode("utf-8")
     return open(fname).read()
@@ -28,7 +30,7 @@ def read_file(fname):
 
 dist_name = 'barbequeue'
 
-readme = "Empty for now."  # read_file('README.rst')
+readme = read_file('README.rst')
 
 # Default description of the distributed package
 description = ("""A queueing library with support for Windows and Unix.""")
