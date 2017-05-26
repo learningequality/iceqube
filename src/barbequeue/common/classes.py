@@ -9,6 +9,12 @@ logger = logging.getLogger(__name__)
 
 
 class Job(object):
+    """
+    Job represents a function whose execution has been deferred through the Client's schedule function.
+
+    Jobs are stored on the storage backend for persistence through restarts, and are scheduled for running
+    to the workers.
+    """
     class State(enum.Enum):
         """
         the Job.State object enumerates a Job's possible valid states.
@@ -40,6 +46,14 @@ class Job(object):
         COMPLETED = 5
 
     def __init__(self, func, *args, **kwargs):
+        """
+        Create a new Job that will run func given the arguments passed to Job(). If the track_progress keyword parameter
+        is given, the worker will pass an update_progress function to update interested parties about the function's
+        progress. See Client.__doc__ for update_progress's function parameters.
+
+        :param func: func can be a callable object, in which case it is turned into an importable string,
+        or it can be an importable string already.
+        """
         self.job_id = kwargs.pop('job_id', None)
         self.state = kwargs.pop('state', self.State.SCHEDULED)
         self.traceback = ""
