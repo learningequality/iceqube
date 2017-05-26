@@ -12,17 +12,31 @@ class Client(object):
         self.storage_backend_module = config['storage_backend']
         self.storage = self.storage_backend_module.Backend(app, namespace)
 
-    def schedule(self, funcstring, *args, **kwargs):
+    def schedule(self, func, *args, **kwargs):
         """
         Schedules a function func for execution.
+
+        The only other special parameter is track_progress. If passed in and not None, the func will be passed in a
+        keyword parameter called update_progress:
+
+        def update_progress(progress, total_progress, stage=""):
+
+        The running function can call the update_progress function to notify interested parties of the function's
+        current progress.
+
+        All other parameters are directly passed to the function when it starts running.
+
+        :type func: callable or str
+        :param func: A callable object that will be scheduled for running.
+        :return: a string representing the job_id.
         """
 
-        # if the funcstring is already a job object, just schedule that directly.
-        if isinstance(funcstring, Job):
-            job = funcstring
+        # if the func is already a job object, just schedule that directly.
+        if isinstance(func, Job):
+            job = func
         # else, turn it into a job first.
         else:
-            job = Job(funcstring, *args, **kwargs)
+            job = Job(func, *args, **kwargs)
 
         job.track_progress = kwargs.pop('track_progress', False)
         job_id = self.storage.schedule_job(job)
@@ -32,12 +46,23 @@ class Client(object):
         """
         Mark a job as canceled and remove it from the list of jobs to be executed.
         Send a message to our workers to stop a job.
+
+        :param job_id: the job_id of the Job to cancel.
         """
         self.storage.cancel_job(job_id)
 
     def status(self, job_id):
         """
-        Gets the status of a job given by job_id.
+        Returns a Job object corresponding to the job_id. From there, you can query for the following attributes:
+
+        - function string to run
+        - its current state (see Job.State for the list of states)
+        - progress (returning an int), total_progress (returning an int), and percentage_progress
+        (derived from running job.progress/total_progress)
+        - the job.exception and job.traceback, if the job's function returned an error
+
+        :param job_id: the job_id to get the Job object for
+        :return: the Job object corresponding to the job_id
         """
         return self.storage.get_job(job_id)
 
@@ -69,5 +94,13 @@ class InMemClient(Client):
         super(InMemClient, self).__init__(app, namespace, storage_backend=storage_inmem, *args, **kwargs)
 
     def shutdown(self):
+        """
+        Shutdown the client and all of its managed resources:
+
+        - the workers
+        - the scheduler threads
+
+        :return: None
+        """
         self._scheduler.shutdown()
         self._workers.shutdown()
