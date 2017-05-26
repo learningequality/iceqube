@@ -75,15 +75,4 @@ class Job(object):
                                                                                          p=self.progress,
                                                                                          total=self.total_progress)
 
-    def serialize(self):
-        pass
 
-
-class ProgressData(namedtuple("_ProgressData", ["id", "order", "data"])):
-    pass
-
-
-class Function(namedtuple("_Function", ["module", "funcname"])):
-    def serialize(self):
-        # Since this is all in memory, there is no need to serialize anything.
-        raise NotImplementedError()
