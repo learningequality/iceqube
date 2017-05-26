@@ -10,6 +10,28 @@ logger = logging.getLogger(__name__)
 
 class Job(object):
     class State(enum.Enum):
+        """
+        the Job.State object enumerates a Job's possible valid states.
+
+        SCHEDULED means the Job has been accepted by the client, but has not been
+        sent to the workers for running.
+
+        QUEUED means the Job has been sent to the workers for running, but has not
+        been run yet (to our knowledge).
+
+        RUNNING means that one of the workers has started running the job, but is not
+        complete yet. If the job has been set to track progress, then the job's progress
+        and total_progress fields should be continuously updated.
+
+        FAILED means that the job's function has raised an exception during runtime.
+        The job's exception and traceback fields should be set.
+
+        CANCELED means that the job has been canceled from running.
+
+        COMPLETED means that the function has run to completion. The job's result field
+        should be set with the function's return value.
+        """
+
         SCHEDULED = 0
         QUEUED = 1
         RUNNING = 2
@@ -69,10 +91,10 @@ class Job(object):
         return float(self.progress) / self.total_progress
 
     def __repr__(self):
-        return "<Job id: {id} state: {state} progress: {p}/{total} func: {func}>".format(id=self.job_id,
-                                                                                         state=self.state.name,
-                                                                                         func=self.func,
-                                                                                         p=self.progress,
-                                                                                         total=self.total_progress)
-
-
+        return "<Job id: {id} state: {state} progress: {p}/{total} func: {func}>".format(
+            id=self.job_id,
+            state=self.state.name,
+            func=self.func,
+            p=self.progress,
+            total=self.total_progress
+        )
