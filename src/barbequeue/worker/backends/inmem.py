@@ -1,10 +1,10 @@
 import logging
-import queue
 import traceback
 from threading import Event, Thread
 
 from barbequeue import humanhash
 from barbequeue.common.classes import BaseCloseableThread, Job
+from barbequeue.common.compat import queue
 from barbequeue.messaging.backends.inmem import Backend as MsgBackend
 from barbequeue.messaging.classes import MessageType, UnknownMessageError, Message
 

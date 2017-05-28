@@ -2,11 +2,11 @@ import logging
 import time
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
-from queue import Queue, Empty
+from ...common.compat import queue
 
 logger = logging.getLogger(__name__)
 
-INMEM_SUPER_MAILBOX = defaultdict(lambda: Queue())
+INMEM_SUPER_MAILBOX = defaultdict(lambda: queue.Queue())
 
 
 class BaseBackend(object):
@@ -59,7 +59,7 @@ class Backend(BaseBackend):
 
                 return True
             elif timeout <= 0:  # we've gone past our alloted timeout, so raise an error
-                raise Empty
+                raise queue.Empty
             else:
                 time.sleep(timeout_increment)
                 timeout -= timeout_increment

@@ -1,10 +1,10 @@
-import queue
 from threading import Event
 
 import pytest
 
 from barbequeue.client import Client, InMemClient
 from barbequeue.common.classes import Job
+from barbequeue.common.compat import queue
 from barbequeue.storage.backends import inmem
 from barbequeue.worker.backends import inmem as worker_inmem
 
