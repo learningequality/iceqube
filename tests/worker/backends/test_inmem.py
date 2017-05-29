@@ -1,3 +1,4 @@
+import logging
 import pytest
 
 from barbequeue.common.classes import Job
@@ -12,6 +13,7 @@ def mailbox():
 
 @pytest.fixture
 def worker(mailbox):
+    logging.info("test_inmem.worker() working")
     b = inmem.Backend(incoming_message_mailbox=mailbox, outgoing_message_mailbox=mailbox)
     yield b
     b.shutdown()
@@ -25,7 +27,8 @@ def startmsg(job):
 
 @pytest.fixture
 def simplejob():
-    job = Job("builtins.id", 'test', job_id='simplejob')
+    logging.info("simplejob spawning a Job")
+    job = Job(id, 'test', job_id='simplejob')
     return job
 
 
@@ -49,7 +52,9 @@ class TestWorker:
     def test_successful_job_adds_to_report_queue(self, worker, simplejob, mocker):
         mocker.spy(worker.reportqueue, 'put')
 
+        logging.info("TestWorker starting simplejob...")
         worker.start_job(simplejob)
+        logging.info("TestWorker joining jobqueue...")
         worker.jobqueue.join()
 
         assert worker.reportqueue.put.call_count == 1

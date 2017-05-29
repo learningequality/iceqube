@@ -1,5 +1,5 @@
 import time
-from queue import Full, Empty
+from barbequeue.common.compat import queue
 from threading import Event
 
 from barbequeue.common.classes import BaseCloseableThread
@@ -55,7 +55,7 @@ class SchedulerThread(BaseCloseableThread):
     def handle_worker_messages(self, timeout):
         try:
             msg = self.messaging_backend.pop(self.incoming_message_mailbox, timeout=timeout)
-        except Empty:
+        except queue.Empty:
             self.logger.debug("No new messages from workers.")
             return
 
@@ -78,7 +78,7 @@ class SchedulerThread(BaseCloseableThread):
 
         try:
             self.worker_queue.put(next_job, timeout=timeout)
-        except Full:
+        except queue.Full:
             self.logger.debug("Worker queue full; skipping scheduling of job {} for now.".format(next_job.job_id))
             return
 
