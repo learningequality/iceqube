@@ -6,6 +6,7 @@ import threading
 from collections import namedtuple
 
 from barbequeue import humanhash
+from barbequeue.common import compat
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,8 @@ class Job(object):
         self.kwargs = kwargs
 
     def get_lambda_to_execute(self):
+        if not isinstance(self.func, str):
+            return self.func
         fqn = self.func
         modulename, funcname = fqn.rsplit('.', 1)
         mod = importlib.import_module(modulename)
@@ -66,7 +69,7 @@ class BaseCloseableThread(threading.Thread):
     DEFAULT_TIMEOUT_SECONDS = 0.2
 
     def __init__(self, shutdown_event, thread_name, *args, **kwargs):
-        assert isinstance(shutdown_event, threading.Event)
+        assert isinstance(shutdown_event, compat.Event)
 
         self.shutdown_event = shutdown_event
         self.thread_name = thread_name
