@@ -21,6 +21,8 @@ def read_file(fname):
     """
     Read file and decode in py2k
     """
+    # This is necessary because we cannot use unicode_literals in
+    # setup.py
     if IS_PYTHON_2:
         return open(fname).read().decode("utf-8")
     return open(fname).read()
@@ -28,7 +30,7 @@ def read_file(fname):
 
 dist_name = 'barbequeue'
 
-readme = "Empty for now."  # read_file('README.rst')
+readme = read_file('README.rst')
 
 # Default description of the distributed package
 description = ("""A queueing library with support for Windows and Unix.""")
@@ -49,11 +51,16 @@ def enable_log_to_stdout(logname):
     log.addHandler(ch)
 
 
+INSTALL_REQUIRES = [
+    'six',
+    'enum34>=1.1,<2',
+]
+
 PYTHON_2_BACKPORTS = [
     "futures>=3.1.1",
 ]
 
-INSTALL_REQUIRES = PYTHON_2_BACKPORTS if IS_PYTHON_2 else []
+INSTALL_REQUIRES += PYTHON_2_BACKPORTS if IS_PYTHON_2 else []
 
 setup(
     name=dist_name,
