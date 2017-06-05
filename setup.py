@@ -53,13 +53,11 @@ def enable_log_to_stdout(logname):
 
 INSTALL_REQUIRES = [
     'six',
-    'enum34>=1.1,<2',
+    "SQLAlchemy>=1.1.0",
 ]
 
 PYTHON_2_BACKPORTS = [
     "futures>=3.1.1",
-    "enum34",
-    "six",
 ]
 
 INSTALL_REQUIRES += PYTHON_2_BACKPORTS if IS_PYTHON_2 else []
