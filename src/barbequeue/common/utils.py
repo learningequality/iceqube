@@ -35,8 +35,6 @@ class BaseCloseableThread(threading.Thread):
     DEFAULT_TIMEOUT_SECONDS = 0.2
 
     def __init__(self, shutdown_event, thread_name, *args, **kwargs):
-        assert isinstance(shutdown_event, threading.Event)
-
         self.shutdown_event = shutdown_event
         self.thread_name = thread_name
         self.thread_id = self._generate_thread_id()

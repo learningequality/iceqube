@@ -1,5 +1,5 @@
 import logging
-from queue import Empty, Full
+from six.moves.queue import Empty, Full
 from threading import Event
 
 from barbequeue.common.utils import InfiniteLoopThread
@@ -40,6 +40,7 @@ class Scheduler(object):
 
     def schedule_next_job(self):
         next_job = self.storage_backend.get_next_scheduled_job()
+        # TODO: don't loop over if workers are already all running
 
         if not next_job:
             logging.debug("No job to schedule right now.")

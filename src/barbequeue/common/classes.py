@@ -7,6 +7,36 @@ from barbequeue.common.utils import import_stringified_func, stringify_func
 
 logger = logging.getLogger(__name__)
 
+class State(object):
+    """
+    the State object enumerates a Job's possible valid states.
+
+    SCHEDULED means the Job has been accepted by the client, but has not been
+    sent to the workers for running.
+
+    QUEUED means the Job has been sent to the workers for running, but has not
+    been run yet (to our knowledge).
+
+    RUNNING means that one of the workers has started running the job, but is not
+    complete yet. If the job has been set to track progress, then the job's progress
+    and total_progress fields should be continuously updated.
+
+    FAILED means that the job's function has raised an exception during runtime.
+    The job's exception and traceback fields should be set.
+
+    CANCELED means that the job has been canceled from running.
+
+    COMPLETED means that the function has run to completion. The job's result field
+    should be set with the function's return value.
+    """
+
+    SCHEDULED = "SCHEDULED"
+    QUEUED = "QUEUED"
+    RUNNING = "RUNNING"
+    FAILED = "FAILED"
+    CANCELED = "CANCELED"
+    COMPLETED = "COMPLETED"
+
 
 class Job(object):
     """
@@ -15,36 +45,6 @@ class Job(object):
     Jobs are stored on the storage backend for persistence through restarts, and are scheduled for running
     to the workers.
     """
-    class State(enum.Enum):
-        """
-        the Job.State object enumerates a Job's possible valid states.
-
-        SCHEDULED means the Job has been accepted by the client, but has not been
-        sent to the workers for running.
-
-        QUEUED means the Job has been sent to the workers for running, but has not
-        been run yet (to our knowledge).
-
-        RUNNING means that one of the workers has started running the job, but is not
-        complete yet. If the job has been set to track progress, then the job's progress
-        and total_progress fields should be continuously updated.
-
-        FAILED means that the job's function has raised an exception during runtime.
-        The job's exception and traceback fields should be set.
-
-        CANCELED means that the job has been canceled from running.
-
-        COMPLETED means that the function has run to completion. The job's result field
-        should be set with the function's return value.
-        """
-
-        SCHEDULED = 0
-        QUEUED = 1
-        RUNNING = 2
-        FAILED = 3
-        CANCELED = 4
-        COMPLETED = 5
-
     def __init__(self, func, *args, **kwargs):
         """
         Create a new Job that will run func given the arguments passed to Job(). If the track_progress keyword parameter
@@ -55,7 +55,7 @@ class Job(object):
         or it can be an importable string already.
         """
         self.job_id = kwargs.pop('job_id', None)
-        self.state = kwargs.pop('state', self.State.SCHEDULED)
+        self.state = kwargs.pop('state', State.SCHEDULED)
         self.traceback = ""
         self.exception = None
         self.track_progress = kwargs.pop('track_progress', False)
@@ -99,15 +99,20 @@ class Job(object):
     def percentage_progress(self):
         """
         Returns a float between 0 and 1, representing the current job's progress in its task.
+        If total_progress is not given or 0, just return self.progress.
         
         :return: float corresponding to the total percentage progress of the job.
         """
-        return float(self.progress) / self.total_progress
+
+        if self.total_progress != 0:
+            return float(self.progress) / self.total_progress
+        else:
+            return self.progress
 
     def __repr__(self):
         return "<Job id: {id} state: {state} progress: {p}/{total} func: {func}>".format(
             id=self.job_id,
-            state=self.state.name,
+            state=self.state,
             func=self.func,
             p=self.progress,
             total=self.total_progress

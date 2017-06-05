@@ -2,7 +2,7 @@ import logging
 import time
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
-from queue import Empty, Queue
+from six.moves.queue import Empty, Queue
 
 logger = logging.getLogger(__name__)
 

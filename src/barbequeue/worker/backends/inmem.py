@@ -54,8 +54,3 @@ class Backend(BaseBackend):
             return
 
         self.report_success(job, result)
-
-
-class Reporter(object):
-    def __init__(self, reportqueue):
-        pass

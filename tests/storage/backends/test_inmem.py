@@ -1,6 +1,6 @@
 import pytest
 
-from barbequeue.common.classes import Job
+from barbequeue.common.classes import Job, State
 from barbequeue.common.utils import stringify_func
 from barbequeue.storage.backends import inmem
 
@@ -32,7 +32,7 @@ class TestBackend:
         assert str(new_job.func) == stringify_func(id)
 
         # Does the job have the right state (SCHEDULED)?
-        assert new_job.state == Job.State.SCHEDULED
+        assert new_job.state == State.SCHEDULED
 
         # Is the job part of the list of scheduled jobs?
         assert job_id in [
@@ -45,7 +45,7 @@ class TestBackend:
         defaultbackend.cancel_job(job_id)
 
         # is the job marked with the CANCELED state?
-        assert defaultbackend.get_job(job_id).state == Job.State.CANCELED
+        assert defaultbackend.get_job(job_id).state == State.CANCELED
 
         # is the job not part of the list of scheduled jobs
         assert job_id not in [
@@ -73,4 +73,4 @@ class TestBackend:
         job = defaultbackend.get_job(job_id)
 
         # is the job marked as completed?
-        assert job.state == Job.State.COMPLETED
+        assert job.state == State.COMPLETED

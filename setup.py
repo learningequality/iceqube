@@ -58,6 +58,8 @@ INSTALL_REQUIRES = [
 
 PYTHON_2_BACKPORTS = [
     "futures>=3.1.1",
+    "enum34",
+    "six",
 ]
 
 INSTALL_REQUIRES += PYTHON_2_BACKPORTS if IS_PYTHON_2 else []
