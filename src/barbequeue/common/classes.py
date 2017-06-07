@@ -1,6 +1,4 @@
-import enum
 import logging
-from collections import namedtuple
 from functools import partial
 
 from barbequeue.common.utils import import_stringified_func, stringify_func

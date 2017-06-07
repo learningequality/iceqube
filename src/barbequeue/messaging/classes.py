@@ -1,4 +1,3 @@
-import enum
 import json
 from collections import namedtuple
 
@@ -7,16 +6,16 @@ class UnknownMessageError(Exception):
     pass
 
 
-class MessageType(enum.Enum):
+class MessageType(object):
     # Job status messages
-    JOB_FAILED = 0  # 0, so it can be falsey
-    JOB_STARTED = 1
-    JOB_UPDATED = 2
-    JOB_COMPLETED = 3
+    JOB_FAILED = "JOB_FAILED"
+    JOB_STARTED = "JOB_STARTED"
+    JOB_UPDATED = "JOB_UPDATED"
+    JOB_COMPLETED = "JOB_COMPLETED"
 
     # Job command messages
-    START_JOB = 101
-    CANCEL_JOB = 102
+    START_JOB = "START_JOB"
+    CANCEL_JOB = "CANCEL_JOB"
 
 
 class Message(namedtuple("_Message", ["type", "message"])):
