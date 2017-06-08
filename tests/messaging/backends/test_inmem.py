@@ -7,13 +7,13 @@ from barbequeue.messaging.classes import Message, MessageType
 
 @pytest.fixture
 def defaultbackend():
-    b = inmem.Backend()
+    b = inmem.MessagingBackend()
     yield b
 
 
 @pytest.fixture
 def otherbackend():
-    b = inmem.Backend()
+    b = inmem.MessagingBackend()
     yield b
 
 

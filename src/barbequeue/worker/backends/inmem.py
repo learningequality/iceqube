@@ -1,17 +1,16 @@
 from concurrent.futures import ThreadPoolExecutor
-from functools import partial
 
-from barbequeue.worker.backends.base import BaseBackend
+from barbequeue.worker.backends.base import BaseWorkerBackend
 
 
-class Backend(BaseBackend):
+class WorkerBackend(BaseWorkerBackend):
     def __init__(self, *args, **kwargs):
         # Internally, we use conncurrent.future.Future to run and track
         # job executions. We need to keep track of which future maps to which
         # job they were made from, and we use the job_future_mapping dict to do
         # so.
         self.job_future_mapping = {}
-        super(Backend, self).__init__(*args, **kwargs)
+        super(WorkerBackend, self).__init__(*args, **kwargs)
 
     def schedule_job(self, job):
         """

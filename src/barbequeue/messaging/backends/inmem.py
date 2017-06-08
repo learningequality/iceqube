@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 INMEM_SUPER_MAILBOX = defaultdict(lambda: Queue())
 
 
-class BaseBackend(object):
+class BaseMessagingBackend(object):
     __metaclass__ = ABCMeta
 
     @abstractmethod
@@ -41,7 +41,7 @@ class BaseBackend(object):
         pass
 
 
-class Backend(BaseBackend):
+class MessagingBackend(BaseMessagingBackend):
     def __init__(self, *args, **kwargs):
         pass
 
@@ -59,7 +59,7 @@ class Backend(BaseBackend):
 
                 return True
             elif timeout <= 0:  # we've gone past our alloted timeout, so raise an error
-                raise Empty
+                raise Empty("Queue currently empty.")
             else:
                 time.sleep(timeout_increment)
                 timeout -= timeout_increment

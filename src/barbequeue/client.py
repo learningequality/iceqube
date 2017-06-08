@@ -10,7 +10,7 @@ from barbequeue.worker.backends import inmem
 class Client(object):
     def __init__(self, app, namespace, **config):
         self.storage_backend_module = config['storage_backend']
-        self.storage = self.storage_backend_module.Backend(app, namespace)
+        self.storage = self.storage_backend_module.StorageBackend(app, namespace)
 
     def schedule(self, func, *args, **kwargs):
         """
@@ -82,11 +82,11 @@ class InMemClient(Client):
         self.worker_mailbox_name = uuid.uuid4().hex
         self.scheduler_mailbox_name = uuid.uuid4().hex
 
-        self._storage = storage_inmem.Backend(app, namespace)
-        self._messaging = messaging_inmem.Backend()
-        self._workers = inmem.Backend(incoming_message_mailbox=self.worker_mailbox_name,
-                                      outgoing_message_mailbox=self.scheduler_mailbox_name,
-                                      msgbackend=self._messaging)
+        self._storage = storage_inmem.StorageBackend(app, namespace)
+        self._messaging = messaging_inmem.MessagingBackend()
+        self._workers = inmem.WorkerBackend(incoming_message_mailbox=self.worker_mailbox_name,
+                                            outgoing_message_mailbox=self.scheduler_mailbox_name,
+                                            msgbackend=self._messaging)
         self._scheduler = Scheduler(self._storage, self._messaging,
                                     worker_mailbox=self.worker_mailbox_name,
                                     incoming_mailbox=self.scheduler_mailbox_name)

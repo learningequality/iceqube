@@ -16,21 +16,43 @@ class Scheduler(object):
 
         self.messaging_backend = messaging_backend
 
-        self.start_scheduler()
-        self.start_worker_message_handler()
+        self.scheduler_thread = self.start_scheduler()
+        self.worker_message_handler_thread = self.start_worker_message_handler()
 
     def start_scheduler(self):
-        self.scheduler_thread = InfiniteLoopThread(func=self.schedule_next_job, thread_name="SCHEDULER",
-                                                   wait_between_runs=0.5)
-        self.scheduler_thread.start()
+        """
+        Start the scheduler thread. This thread reads the queue of jobs to be
+        scheduled and sends them to the workers.
+        Returns: None
+
+        """
+        t = InfiniteLoopThread(func=self.schedule_next_job, thread_name="SCHEDULER",
+                               wait_between_runs=0.5)
+        t.start()
+        return t
 
     def start_worker_message_handler(self):
-        self.worker_message_handler_thread = InfiniteLoopThread(func=lambda: self.handle_worker_messages(timeout=2),
-                                                                thread_name="WORKERMESSAGEHANDLER",
-                                                                wait_between_runs=0.5)
-        self.worker_message_handler_thread.start()
+        """
+        Start the worker message handler thread, that loops over messages from workers
+        (job progress updates, failures and successes etc.) and then updates the job's status.
+        Returns: None
+
+        """
+        t = InfiniteLoopThread(func=lambda: self.handle_worker_messages(timeout=2),
+                               thread_name="WORKERMESSAGEHANDLER",
+                               wait_between_runs=0.5)
+        t.start()
+        return t
 
     def shutdown(self, wait=True):
+        """
+        Shut down the worker message handler and scheduler threads.
+        Args:
+            wait: If true, block until both threads have successfully shut down. If False, return immediately.
+
+        Returns: None
+
+        """
         self.scheduler_thread.stop()
         self.worker_message_handler_thread.stop()
 
@@ -39,6 +61,12 @@ class Scheduler(object):
             self.worker_message_handler_thread.join()
 
     def schedule_next_job(self):
+        """
+        Get the next job in the queue to be scheduled, and send a message
+        to the workers to start the job.
+        Returns: None
+
+        """
         next_job = self.storage_backend.get_next_scheduled_job()
         # TODO: don't loop over if workers are already all running
 
@@ -55,6 +83,16 @@ class Scheduler(object):
             return
 
     def handle_worker_messages(self, timeout):
+        """
+        Read messages that are placed in self.incoming_mailbox,
+        and then update the job states corresponding to each message.
+
+        Args:
+            timeout: How long to wait for an incoming message, if the mailbox is empty right now.
+
+        Returns: None
+
+        """
         try:
             msg = self.messaging_backend.pop(self.incoming_mailbox, timeout=timeout)
         except Empty:

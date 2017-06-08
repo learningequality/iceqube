@@ -1,10 +1,12 @@
 import uuid
 from collections import defaultdict, deque
 from copy import copy
+from threading import Event
 
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Integer, String, PickleType, Boolean, DateTime, func, create_engine, Index
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from barbequeue.common.classes import Job, State
 from barbequeue.storage.backends.default import BaseBackend
@@ -16,13 +18,18 @@ Base = declarative_base()
 
 
 class ORMJob(Base):
+    """
+    The DB representation of a common.classes.Job object,
+    storing the relevant details needed by the job storage
+    backend.
+    """
     __tablename__ = "jobs"
 
     # The hex UUID given to the job upon first creation
     id = Column(String, primary_key=True, autoincrement=False)
 
     # The job's state. Inflated here for easier querying to the job's state.
-    state = Column(Integer, index=True)
+    state = Column(String, index=True)
 
     # The job's order in the entire global queue of jobs.
     queue_order = Column(Integer, autoincrement=True)
@@ -42,19 +49,20 @@ class ORMJob(Base):
     __table_args__ = (Index('app_namespace_index', 'app', 'namespace'),)
 
 
-class Backend(BaseBackend):
+class StorageBackend(BaseBackend):
     def __init__(self, app, namespace, *args, **kwargs):
         self.app = app
         self.namespace = namespace
         self.namespace_id = uuid.uuid5(uuid.NAMESPACE_DNS, app + namespace).hex
-        self.queue = INMEM_QUEUE[self.namespace_id]
 
-        self.engine = create_engine('sqlite:///:memory:')
-        self.session = sessionmaker(bind=self.engine)()
+        self.engine = create_engine('sqlite:///:memory:', echo=True, connect_args={'check_same_thread': False},
+                                    poolclass=StaticPool)
+        Base.metadata.create_all(self.engine)
+        self.sessionmaker = sessionmaker(bind=self.engine)
+        self.hack_hack_hack_now_has_scheduled_job = Event()
 
         # create the tables if they don't exist yet
-        Base.metadata.create_all(self.engine)
-        super(Backend, self).__init__(*args, **kwargs)
+        super(StorageBackend, self).__init__(*args, **kwargs)
 
     def schedule_job(self, j):
         """
@@ -65,9 +73,11 @@ class Backend(BaseBackend):
         job_id = uuid.uuid4().hex
         j.job_id = job_id
 
+        session = self.sessionmaker()
         orm_job = ORMJob(id=job_id, state=j.state, app=self.app, namespace=self.namespace, obj=j)
-        self.session.add(orm_job)
-        self.session.commit()
+        session.add(orm_job)
+        session.commit()
+        self.hack_hack_hack_now_has_scheduled_job.set()
 
         return job_id
 
@@ -77,35 +87,33 @@ class Backend(BaseBackend):
         Mark the job as canceled. Does not actually try to cancel a running job.
 
         """
-        job = self._get_job_nocopy(job_id)
-
-        # Mark the job as canceled.
-        job.state = State.CANCELED
-
-        # Remove it from the queue.
-        self.queue.remove(job_id)
-
-        return self.get_job(job)
-
-    def _get_job_and_orm_job(self, job_id):
-        orm_job = self.session.query(ORMJob).filter_by(id=job_id).one()
-        job = orm_job.obj
-        return job, orm_job
+        raise NotImplemented()
+        # job = self._get_job_nocopy(job_id)
+        #
+        # # Mark the job as canceled.
+        # job.state = State.CANCELED
+        #
+        # # Remove it from the queue.
+        # self.queue.remove(job_id)
+        #
+        # return self.get_job(job)
 
     def get_next_scheduled_job(self):
-        try:
-            job = self.get_job(self.queue[0])
-        except IndexError:
+        s = self.sessionmaker()
+        orm_job = self._ns_query(s).filter_by(state=State.SCHEDULED).order_by(ORMJob.queue_order).first()
+        s.flush()
+        if orm_job:
+            job = orm_job.obj
+        else:
             job = None
-
-        # logging.warning("getting job with job id {}".format(job.job_id))
         return job
 
     def get_scheduled_jobs(self):
         return [self.get_job(jid) for jid in INMEM_QUEUE[self.namespace_id]]
 
     def get_job(self, job_id):
-        job, _ = self._get_job_and_orm_job(job_id)
+        s = self.sessionmaker()
+        job, _ = self._get_job_and_orm_job(job_id, s)
         return job
 
     def clear(self, job_id=None):
@@ -114,16 +122,19 @@ class Backend(BaseBackend):
         jobs marked COMPLETED. If job_id is given, clear out the given job's
         data. This function won't do anything if the job's state is not COMPLETED.
         """
-        q = self._ns_query()
+        s = self.sessionmaker()
+        q = self._ns_query(s)
         if job_id:
             q = q.filter_by(id=job_id)
 
         q = q.filter_by(state=State.COMPLETED)
+        s.flush()
 
         q.delete()
 
     def update_job_progress(self, job_id, progress, total_progress):
-        job, orm_job = self._update_job_state(job_id, state=State.RUNNING, commit=False)
+        session = self.sessionmaker()
+        job, orm_job = self._update_job_state(job_id, state=State.RUNNING, session=session)
         job.progress = progress
         job.total_progress = total_progress
         orm_job.obj = job
@@ -150,20 +161,27 @@ class Backend(BaseBackend):
     def complete_job(self, job_id):
         self._update_job_state(job_id, State.COMPLETED)
 
-    def _update_job_state(self, job_id, state, commit=True):
-        job, orm_job = self._get_job_and_orm_job(job_id)
+    def _update_job_state(self, job_id, state, session=None):
+        scoped_session = session if session else self.sessionmaker()
+
+        job, orm_job = self._get_job_and_orm_job(job_id, scoped_session)
         orm_job.state = job.state = state
         orm_job.obj = job
-        if commit:
-            self.session.commit()
+        if session:
+            session.commit()
             self.notify_of_job_update(job_id)
         return job, orm_job
 
-    def _ns_query(self):
+    def _get_job_and_orm_job(self, job_id, session):
+        orm_job = session.query(ORMJob).filter_by(id=job_id).one()
+        job = orm_job.obj
+        return job, orm_job
+
+    def _ns_query(self, session):
         """
         Return a SQLAlchemy query that is already namespaced by the app and namespace given to this backend
         during initialization.
         Returns: a SQLAlchemy query object
 
         """
-        return self.session.query(ORMJob).filter(ORMJob.app == self.app, ORMJob.namespace == self.namespace)
+        return session.query(ORMJob).filter(ORMJob.app == self.app, ORMJob.namespace == self.namespace)

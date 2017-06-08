@@ -3,7 +3,7 @@ from threading import Event
 import pytest
 
 from barbequeue.common.classes import Job
-from barbequeue.messaging.backends.inmem import Backend
+from barbequeue.messaging.backends.inmem import MessagingBackend
 from barbequeue.messaging.classes import MessageType
 from barbequeue.worker.backends import inmem
 
@@ -15,12 +15,12 @@ def mailbox():
 
 @pytest.fixture
 def msgbackend():
-    return Backend()
+    return MessagingBackend()
 
 
 @pytest.fixture
 def worker(mailbox, msgbackend):
-    b = inmem.Backend(incoming_message_mailbox=mailbox, outgoing_message_mailbox=mailbox, msgbackend=msgbackend)
+    b = inmem.WorkerBackend(incoming_message_mailbox=mailbox, outgoing_message_mailbox=mailbox, msgbackend=msgbackend)
     yield b
     b.shutdown()
 

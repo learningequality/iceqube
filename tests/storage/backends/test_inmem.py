@@ -7,14 +7,14 @@ from barbequeue.storage.backends import inmem
 
 @pytest.fixture
 def defaultbackend():
-    backend = inmem.Backend('pytest', 'default')
+    backend = inmem.StorageBackend('pytest', 'default')
     yield backend
     backend.clear()
 
 
 @pytest.fixture
 def extrabackend():
-    return inmem.Backend('pytest', 'extra')
+    return inmem.StorageBackend('pytest', 'extra')
 
 
 @pytest.fixture
