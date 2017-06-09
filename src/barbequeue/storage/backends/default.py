@@ -2,6 +2,8 @@ import abc
 from collections import defaultdict
 from threading import Event
 
+from barbequeue.exceptions import TimeoutError
+
 JOB_EVENT_MAPPING = defaultdict(lambda: Event())
 
 
@@ -46,7 +48,8 @@ class BaseBackend(object):
         if timeout is not None, then this function raises barbequeue.exceptions.TimeoutError.
         
         :param job_id: the job's job_id to monitor for changes.
-        :param timeout: if None, wait forever for a job update. If given, wait until timeout seconds, and then raise barbequeue.exceptions.TimeoutError.
+        :param timeout: if None, wait forever for a job update. If given, wait until timeout seconds, and then raise
+        barbequeue.exceptions.TimeoutError.
         :return: the Job object corresponding to job_id.
         """
         # internally, we register an Event object for each entry in this function.
@@ -61,8 +64,7 @@ class BaseBackend(object):
         if result:
             return job
         else:
-            # TODO: Create barbequeue.exceptions.TimeoutError
-            raise Exception()
+            raise TimeoutError("Job {} has not received any updates.".format(job_id))
 
     @staticmethod
     def notify_of_job_update(job_id):
