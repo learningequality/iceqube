@@ -19,7 +19,9 @@ def otherbackend():
 
 @pytest.fixture
 def msg():
-    msgtype = random.choice(list(MessageType))
+    msg_types = [MessageType.JOB_FAILED, MessageType.JOB_STARTED, MessageType.JOB_UPDATED,
+                 MessageType.JOB_COMPLETED, MessageType.START_JOB, MessageType.CANCEL_JOB]
+    msgtype = random.choice(msg_types)
     m = Message(msgtype, "doesntmatter")
     yield m
 
