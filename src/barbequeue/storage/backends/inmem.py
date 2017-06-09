@@ -87,7 +87,7 @@ class StorageBackend(BaseBackend):
         Mark the job as canceled. Does not actually try to cancel a running job.
 
         """
-        raise NotImplemented()
+        raise NotImplementedError
         # job = self._get_job_nocopy(job_id)
         #
         # # Mark the job as canceled.
