@@ -6,9 +6,9 @@ from threading import Event
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Integer, String, PickleType, Boolean, DateTime, func, create_engine, Index
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.pool import QueuePool, AssertionPool, StaticPool
 
-from barbequeue.common.classes import Job, State
+from barbequeue.common.classes import State
 from barbequeue.storage.backends.default import BaseBackend
 
 INMEM_STORAGE = {}
@@ -55,8 +55,12 @@ class StorageBackend(BaseBackend):
         self.namespace = namespace
         self.namespace_id = uuid.uuid5(uuid.NAMESPACE_DNS, app + namespace).hex
 
-        self.engine = create_engine('sqlite:///:memory:', echo=True, connect_args={'check_same_thread': False},
-                                    poolclass=StaticPool)
+        self.engine = create_engine('sqlite:///:memory:', connect_args={'check_same_thread': False},
+                                    poolclass=AssertionPool)
+        # self.engine = create_engine('sqlite:///test.db', connect_args={'check_same_thread': False},
+        # poolclass=QueuePool)
+        # self.engine = create_engine('sqlite:///test.db', connect_args={'check_same_thread': False},
+        #                             poolclass=AssertionPool)
         Base.metadata.create_all(self.engine)
         self.sessionmaker = sessionmaker(bind=self.engine)
         self.hack_hack_hack_now_has_scheduled_job = Event()
@@ -102,6 +106,7 @@ class StorageBackend(BaseBackend):
         s = self.sessionmaker()
         orm_job = self._ns_query(s).filter_by(state=State.SCHEDULED).order_by(ORMJob.queue_order).first()
         s.flush()
+        s.close()
         if orm_job:
             job = orm_job.obj
         else:
@@ -114,6 +119,7 @@ class StorageBackend(BaseBackend):
     def get_job(self, job_id):
         s = self.sessionmaker()
         job, _ = self._get_job_and_orm_job(job_id, s)
+        s.close()
         return job
 
     def clear(self, job_id=None):
@@ -170,6 +176,8 @@ class StorageBackend(BaseBackend):
         if session:
             session.commit()
             self.notify_of_job_update(job_id)
+        else:  # session was created by our hand. Close it now.
+            scoped_session.close()
         return job, orm_job
 
     def _get_job_and_orm_job(self, job_id, session):
