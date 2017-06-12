@@ -13,11 +13,6 @@ def defaultbackend():
 
 
 @pytest.fixture
-def extrabackend():
-    return inmem.StorageBackend('pytest', 'extra')
-
-
-@pytest.fixture
 def simplejob():
     return Job(id)
 

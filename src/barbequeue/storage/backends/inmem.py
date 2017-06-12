@@ -3,6 +3,7 @@ from collections import defaultdict, deque
 from copy import copy
 from threading import Event
 
+import logging
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Integer, String, PickleType, Boolean, DateTime, func, create_engine, Index
 from sqlalchemy.orm import sessionmaker
@@ -56,11 +57,7 @@ class StorageBackend(BaseBackend):
         self.namespace_id = uuid.uuid5(uuid.NAMESPACE_DNS, app + namespace).hex
 
         self.engine = create_engine('sqlite:///:memory:', connect_args={'check_same_thread': False},
-                                    poolclass=AssertionPool)
-        # self.engine = create_engine('sqlite:///test.db', connect_args={'check_same_thread': False},
-        # poolclass=QueuePool)
-        # self.engine = create_engine('sqlite:///test.db', connect_args={'check_same_thread': False},
-        #                             poolclass=AssertionPool)
+                                    poolclass=StaticPool)
         Base.metadata.create_all(self.engine)
         self.sessionmaker = sessionmaker(bind=self.engine)
         self.hack_hack_hack_now_has_scheduled_job = Event()
@@ -80,7 +77,10 @@ class StorageBackend(BaseBackend):
         session = self.sessionmaker()
         orm_job = ORMJob(id=job_id, state=j.state, app=self.app, namespace=self.namespace, obj=j)
         session.add(orm_job)
-        session.commit()
+        try:
+            session.commit()
+        except Exception as e:
+            logging.error("Got an error running session.commit(): {}".format(e))
         self.hack_hack_hack_now_has_scheduled_job.set()
 
         return job_id
@@ -105,7 +105,6 @@ class StorageBackend(BaseBackend):
     def get_next_scheduled_job(self):
         s = self.sessionmaker()
         orm_job = self._ns_query(s).filter_by(state=State.SCHEDULED).order_by(ORMJob.queue_order).first()
-        s.flush()
         s.close()
         if orm_job:
             job = orm_job.obj
@@ -145,8 +144,9 @@ class StorageBackend(BaseBackend):
         job.total_progress = total_progress
         orm_job.obj = job
 
-        self.session.commit()
-        self.notify_of_job_update(job_id)
+        session.add(orm_job)
+        session.commit()
+        session.close()
         return job_id
 
     def mark_job_as_queued(self, job_id):
@@ -173,11 +173,12 @@ class StorageBackend(BaseBackend):
         job, orm_job = self._get_job_and_orm_job(job_id, scoped_session)
         orm_job.state = job.state = state
         orm_job.obj = job
-        if session:
-            session.commit()
-            self.notify_of_job_update(job_id)
-        else:  # session was created by our hand. Close it now.
+        session.add(orm_job)
+        session.commit()
+        if not session:  # session was created by our hand. Close it now.
+            scoped_session.commit()
             scoped_session.close()
+        self.notify_of_job_update(job_id)
         return job, orm_job
 
     def _get_job_and_orm_job(self, job_id, session):

@@ -9,8 +9,7 @@ from barbequeue.worker.backends import inmem
 
 class Client(object):
     def __init__(self, app, namespace, **config):
-        self.storage_backend_module = config['storage_backend']
-        self.storage = self.storage_backend_module.StorageBackend(app, namespace)
+        self.storage = config['storage_backend']
 
     def schedule(self, func, *args, **kwargs):
         """
@@ -69,7 +68,8 @@ class Client(object):
 
 class InMemClient(Client):
     """
-    A client that starts and runs all jobs in memory. In particular, the following barbequeue components are all running 
+    A client that starts and runs all jobs in memory. In particular, the following barbequeue components are all
+    running
     their in-memory counterparts:
     
     - Scheduler
@@ -91,7 +91,7 @@ class InMemClient(Client):
                                     worker_mailbox=self.worker_mailbox_name,
                                     incoming_mailbox=self.scheduler_mailbox_name)
 
-        super(InMemClient, self).__init__(app, namespace, storage_backend=storage_inmem, *args, **kwargs)
+        super(InMemClient, self).__init__(app, namespace, storage_backend=self._storage, *args, **kwargs)
 
     def shutdown(self):
         """
@@ -102,5 +102,6 @@ class InMemClient(Client):
 
         :return: None
         """
+        self._storage.clear()
         self._scheduler.shutdown()
         self._workers.shutdown()

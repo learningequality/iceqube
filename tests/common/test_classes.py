@@ -26,13 +26,8 @@ def inmem_worker_backend():
 
 
 @pytest.fixture
-def client(backend):
-    return Client("pytest", "test", storage_backend=inmem)
-
-
-@pytest.fixture
 def inmem_client():
-    c = InMemClient('pytest', 'test')
+    c = InMemClient('pytest', 'inmem_test')
     yield c
     c.shutdown()
 
@@ -43,9 +38,9 @@ def simplejob():
 
 
 @pytest.fixture
-def scheduled_job(client, simplejob):
-    job_id = client.schedule(simplejob)
-    return client.storage.get_job(job_id)
+def scheduled_job(inmem_client, simplejob):
+    job_id = inmem_client.schedule(simplejob)
+    return inmem_client.storage.get_job(job_id)
 
 
 FLAG = False
@@ -133,11 +128,11 @@ def failing_func():
 
 
 class TestClient(object):
-    def test_schedules_a_function(self, client):
-        job_id = client.schedule(id)
+    def test_schedules_a_function(self, inmem_client):
+        job_id = inmem_client.schedule(id, 1)
 
         # is the job recorded in the chosen backend?
-        assert client.status(job_id).job_id == job_id
+        assert inmem_client.status(job_id).job_id == job_id
 
     def test_schedule_runs_function(self, inmem_client, flag):
         job_id = inmem_client.schedule(set_flag, flag)
@@ -178,20 +173,20 @@ class TestClient(object):
         job = inmem_client._storage.wait_for_job_update(job_id, timeout=2)
         assert job.state in [State.QUEUED, State.FAILED]
 
-    def test_stringify_func_is_importable(self, client):
+    def test_stringify_func_is_importable(self):
         funcstring = stringify_func(set_flag)
         func = import_stringified_func(funcstring)
 
         assert set_flag == func
 
-    def test_can_get_job_details(self, client, scheduled_job):
-        assert client.status(
+    def test_can_get_job_details(self, inmem_client, scheduled_job):
+        assert inmem_client.status(
             scheduled_job.job_id
         ).job_id == scheduled_job.job_id
 
-    def test_can_cancel_a_job(self, client, scheduled_job):
-        client.cancel(scheduled_job.job_id)
+    def test_can_cancel_a_job(self, inmem_client, scheduled_job):
+        inmem_client.cancel(scheduled_job.job_id)
 
         # Is our job marked as canceled?
-        job = client.status(scheduled_job.job_id)
+        job = inmem_client.status(scheduled_job.job_id)
         assert job.state == State.CANCELED
