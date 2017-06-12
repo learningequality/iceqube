@@ -5,7 +5,7 @@ from threading import Event
 
 import logging
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, Integer, String, PickleType, Boolean, DateTime, func, create_engine, Index
+from sqlalchemy import Column, Integer, String, PickleType, Boolean, DateTime, func, create_engine, Index, or_
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import QueuePool, AssertionPool, StaticPool
 
@@ -115,6 +115,12 @@ class StorageBackend(BaseBackend):
     def get_scheduled_jobs(self):
         return [self.get_job(jid) for jid in INMEM_QUEUE[self.namespace_id]]
 
+    def get_all_jobs(self):
+        s = self.sessionmaker()
+        orm_jobs = self._ns_query(s).all()
+        s.close()
+        return [o.obj for o in orm_jobs]
+
     def get_job(self, job_id):
         s = self.sessionmaker()
         job, _ = self._get_job_and_orm_job(job_id, s)
@@ -125,15 +131,15 @@ class StorageBackend(BaseBackend):
         """
         Clear the queue and the job data. If job_id is not given, clear out all
         jobs marked COMPLETED. If job_id is given, clear out the given job's
-        data. This function won't do anything if the job's state is not COMPLETED.
+        data. This function won't do anything if the job's state is not COMPLETED or FAILED.
         """
         s = self.sessionmaker()
         q = self._ns_query(s)
         if job_id:
             q = q.filter_by(id=job_id)
 
-        q = q.filter_by(state=State.COMPLETED)
-        s.flush()
+        q = q.filter(or_(ORMJob.state == State.COMPLETED, ORMJob.state == State.FAILED))
+        s.close()
 
         q.delete()
 

@@ -50,6 +50,14 @@ class Client(object):
         """
         self.storage.cancel_job(job_id)
 
+    def all_jobs(self):
+        """
+        Return all the jobs scheduled, queued, running, failed or completed.
+        Returns: A list of all jobs.
+
+        """
+        return self.storage.get_all_jobs()
+
     def status(self, job_id):
         """
         Returns a Job object corresponding to the job_id. From there, you can query for the following attributes:
@@ -64,6 +72,12 @@ class Client(object):
         :return: the Job object corresponding to the job_id
         """
         return self.storage.get_job(job_id)
+
+    def clear(self):
+        """
+        Clear all jobs that have succeeded or failed.
+        """
+        self.storage.clear()
 
 
 class InMemClient(Client):
