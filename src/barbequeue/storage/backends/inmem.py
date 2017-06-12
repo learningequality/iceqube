@@ -146,6 +146,18 @@ class StorageBackend(BaseBackend):
     def update_job_progress(self, job_id, progress, total_progress):
         session = self.sessionmaker()
         job, orm_job = self._update_job_state(job_id, state=State.RUNNING, session=session)
+
+        # Note (aron): looks like SQLAlchemy doesn't automatically
+        # save any pickletype fields even if we re-set (orm_job.obj = job) that
+        # field. My hunch is that it's tracking the id of the object,
+        # and if that doesn't change, then SQLAlchemy doesn't repickle the object
+        # and save to the DB.
+        # Our hack here is to just copy the job object, and then set thespecific
+        # field we want to edit, in this case the job.state. That forces
+        # SQLAlchemy to re-pickle the object, thus setting it to the correct state.
+
+        job = copy(job)
+
         job.progress = progress
         job.total_progress = total_progress
         orm_job.obj = job
@@ -177,10 +189,20 @@ class StorageBackend(BaseBackend):
         scoped_session = session if session else self.sessionmaker()
 
         job, orm_job = self._get_job_and_orm_job(job_id, scoped_session)
+
+        # Note (aron): looks like SQLAlchemy doesn't automatically
+        # save any pickletype fields even if we re-set (orm_job.obj = job) that
+        # field. My hunch is that it's tracking the id of the object,
+        # and if that doesn't change, then SQLAlchemy doesn't repickle the object
+        # and save to the DB.
+        # Our hack here is to just copy the job object, and then set thespecific
+        # field we want to edit, in this case the job.state. That forces
+        # SQLAlchemy to re-pickle the object, thus setting it to the correct state.
+        job = copy(job)
+
         orm_job.state = job.state = state
         orm_job.obj = job
-        session.add(orm_job)
-        session.commit()
+        scoped_session.add(orm_job)
         if not session:  # session was created by our hand. Close it now.
             scoped_session.commit()
             scoped_session.close()
@@ -188,7 +210,7 @@ class StorageBackend(BaseBackend):
         return job, orm_job
 
     def _get_job_and_orm_job(self, job_id, session):
-        orm_job = session.query(ORMJob).filter_by(id=job_id).one()
+        orm_job = self._ns_query(session).filter_by(id=job_id).one()
         job = orm_job.obj
         return job, orm_job
 
