@@ -177,7 +177,37 @@ class StorageBackend(BaseBackend):
         self._update_job_state(job_id, State.QUEUED)
 
     def mark_job_as_failed(self, job_id, exception, traceback):
-        self._update_job_state(job_id, State.FAILED)
+        """
+        Mark the job as failed, and record the traceback and exception.
+        Args:
+            job_id: The job_id of the job that failed.
+            exception: The exception object thrown by the job.
+            traceback: The traceback, if any. Note (aron): Not implemented yet. We need to find a way
+            for the conncurrent.futures workers to throw back the error to us.
+
+        Returns: None
+
+        """
+        session = self.sessionmaker()
+        job, orm_job = self._update_job_state(job_id, State.FAILED, session=session)
+
+        # Note (aron): looks like SQLAlchemy doesn't automatically
+        # save any pickletype fields even if we re-set (orm_job.obj = job) that
+        # field. My hunch is that it's tracking the id of the object,
+        # and if that doesn't change, then SQLAlchemy doesn't repickle the object
+        # and save to the DB.
+        # Our hack here is to just copy the job object, and then set thespecific
+        # field we want to edit, in this case the job.state. That forces
+        # SQLAlchemy to re-pickle the object, thus setting it to the correct state.
+        job = copy(job)
+
+        job.exception = exception
+        job.traceback = traceback
+        orm_job.obj = job
+
+        session.add(orm_job)
+        session.commit()
+        session.close()
 
     def mark_job_as_running(self, job_id):
         self._update_job_state(job_id, State.RUNNING)

@@ -1,3 +1,5 @@
+import traceback
+
 from concurrent.futures import ThreadPoolExecutor
 
 from barbequeue.worker.backends.base import BaseWorkerBackend
@@ -20,7 +22,7 @@ class WorkerBackend(BaseWorkerBackend):
         :param job: the job to schedule for running.
         :return: 
         """
-        l = job.get_lambda_to_execute()
+        l = _reraise_with_traceback(job.get_lambda_to_execute())
 
         if job.track_progress:
             future = self.workers.submit(l, self.update_progress)
@@ -47,9 +49,29 @@ class WorkerBackend(BaseWorkerBackend):
         try:
             result = future.result()
         except Exception as e:
-            # TODO: concurrent.futures doesn't provide the stacktrace.
-            # find a way to catch the stacktrace.
-            self.report_error(job, e, "")
+            self.report_error(job, e, e.traceback)
             return
 
         self.report_success(job, result)
+
+
+def _reraise_with_traceback(f):
+    """
+    Call the function normally. But if the function raises an error, attach the str(traceback)
+    into the function.traceback attribute, then reraise the error.
+    Args:
+        f: The function to run.
+
+    Returns: A function that wraps f, attaching the traceback if an error occurred.
+
+    """
+
+    def wrap(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except Exception as e:
+            traceback_str = traceback.format_exc()
+            e.traceback = traceback_str
+            raise e
+
+    return wrap
