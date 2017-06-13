@@ -139,9 +139,9 @@ class StorageBackend(BaseBackend):
             q = q.filter_by(id=job_id)
 
         q = q.filter(or_(ORMJob.state == State.COMPLETED, ORMJob.state == State.FAILED))
+        q.delete(synchronize_session=False)
+        s.commit()
         s.close()
-
-        q.delete()
 
     def update_job_progress(self, job_id, progress, total_progress):
         session = self.sessionmaker()
