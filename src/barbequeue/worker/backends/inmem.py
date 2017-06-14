@@ -1,17 +1,22 @@
 import traceback
 
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 
 from barbequeue.worker.backends.base import BaseWorkerBackend
 
 
 class WorkerBackend(BaseWorkerBackend):
-    def __init__(self, *args, **kwargs):
+    # worker types
+    PROCESS = 1
+    THREAD = 0
+
+    def __init__(self, worker_type=THREAD, *args, **kwargs):
         # Internally, we use conncurrent.future.Future to run and track
         # job executions. We need to keep track of which future maps to which
         # job they were made from, and we use the job_future_mapping dict to do
         # so.
         self.job_future_mapping = {}
+        self.worker_type = worker_type
         super(WorkerBackend, self).__init__(*args, **kwargs)
 
     def schedule_job(self, job):
@@ -40,7 +45,17 @@ class WorkerBackend(BaseWorkerBackend):
         self.workers.shutdown(wait=wait)
 
     def start_workers(self, num_workers):
-        return ThreadPoolExecutor(max_workers=num_workers)
+        if self.worker_type == self.PROCESS:
+            worker_executor = ProcessPoolExecutor
+        elif self.worker_type == self.THREAD:
+            worker_executor = ThreadPoolExecutor
+        else:
+            raise ValueError(
+                "WorkerBackend.worker_type must be one of [WorkerBackend.PROCESS, WorkerBackend.THREAD]"
+            )
+
+        pool = worker_executor(max_workers=num_workers)
+        return pool
 
     def handle_finished_future(self, future):
         # get back the job assigned to the future

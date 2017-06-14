@@ -80,32 +80,36 @@ class Client(object):
         self.storage.clear()
 
 
-class InMemClient(Client):
-    """
-    A client that starts and runs all jobs in memory. In particular, the following barbequeue components are all
-    running
-    their in-memory counterparts:
-    
-    - Scheduler
-    - Job storage
-    - Workers
-    """
+class SimpleClient(Client):
+    # types of workers we can spawn
+    PROCESS_BASED = inmem.WorkerBackend.PROCESS
+    THREAD_BASED = inmem.WorkerBackend.THREAD
 
-    def __init__(self, app, namespace, *args, **kwargs):
-        # generate a unique name for our two mailboxes
+    # specify if we want our storage backend to be in-memory
+    MEMORY = storage_inmem.StorageBackend.MEMORY
+
+    def __init__(self, app, worker_type=THREAD_BASED, storage_path=MEMORY):
+
+        # simplify configuration by making app and namespace the same thing
+        namespace = app
+
         self.worker_mailbox_name = uuid.uuid4().hex
         self.scheduler_mailbox_name = uuid.uuid4().hex
-
-        self._storage = storage_inmem.StorageBackend(app, namespace)
+        self._storage = storage_inmem.StorageBackend(app, app, storage_path)
         self._messaging = messaging_inmem.MessagingBackend()
-        self._workers = inmem.WorkerBackend(incoming_message_mailbox=self.worker_mailbox_name,
-                                            outgoing_message_mailbox=self.scheduler_mailbox_name,
-                                            msgbackend=self._messaging)
-        self._scheduler = Scheduler(self._storage, self._messaging,
-                                    worker_mailbox=self.worker_mailbox_name,
-                                    incoming_mailbox=self.scheduler_mailbox_name)
+        self._workers = inmem.WorkerBackend(
+            incoming_message_mailbox=self.worker_mailbox_name,
+            outgoing_message_mailbox=self.scheduler_mailbox_name,
+            msgbackend=self._messaging,
+            worker_type=worker_type)
+        self._scheduler = Scheduler(
+            self._storage,
+            self._messaging,
+            worker_mailbox=self.worker_mailbox_name,
+            incoming_mailbox=self.scheduler_mailbox_name)
 
-        super(InMemClient, self).__init__(app, namespace, storage_backend=self._storage, *args, **kwargs)
+        super(SimpleClient, self).__init__(
+            app, namespace, storage_backend=self._storage)
 
     def shutdown(self):
         """
@@ -119,3 +123,23 @@ class InMemClient(Client):
         self._storage.clear()
         self._scheduler.shutdown()
         self._workers.shutdown()
+
+
+class InMemClient(SimpleClient):
+    """
+    A client that starts and runs all jobs in memory. In particular, the following barbequeue components are all
+    running
+    their in-memory counterparts:
+    
+    - Scheduler
+    - Job storage
+    - Workers
+    """
+
+    def __init__(self, app, *args, **kwargs):
+        super(InMemClient, self).__init__(
+            app,
+            worker_type=self.THREAD_BASED,
+            storage_path=self.MEMORY,
+            *args,
+            **kwargs)

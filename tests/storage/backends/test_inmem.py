@@ -7,7 +7,8 @@ from barbequeue.storage.backends import inmem
 
 @pytest.fixture
 def defaultbackend():
-    backend = inmem.StorageBackend('pytest', 'default')
+    backend = inmem.StorageBackend(
+        'pytest', 'pytest', storage_path=inmem.StorageBackend.MEMORY)
     yield backend
     backend.clear()
 

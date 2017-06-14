@@ -7,7 +7,8 @@ from barbequeue.messaging.classes import Message, MessageType
 
 
 class Scheduler(object):
-    def __init__(self, storage_backend, messaging_backend, incoming_mailbox, worker_mailbox):
+    def __init__(self, storage_backend, messaging_backend, incoming_mailbox,
+                 worker_mailbox):
         self.incoming_mailbox = incoming_mailbox
         self.worker_mailbox = worker_mailbox
 
@@ -17,7 +18,8 @@ class Scheduler(object):
         self.messaging_backend = messaging_backend
 
         self.scheduler_thread = self.start_scheduler()
-        self.worker_message_handler_thread = self.start_worker_message_handler()
+        self.worker_message_handler_thread = self.start_worker_message_handler(
+        )
 
     def start_scheduler(self):
         """
@@ -26,8 +28,10 @@ class Scheduler(object):
         Returns: None
 
         """
-        t = InfiniteLoopThread(func=self.schedule_next_job, thread_name="SCHEDULER",
-                               wait_between_runs=0.5)
+        t = InfiniteLoopThread(
+            func=self.schedule_next_job,
+            thread_name="SCHEDULER",
+            wait_between_runs=0.5)
         t.start()
         return t
 
@@ -38,9 +42,10 @@ class Scheduler(object):
         Returns: None
 
         """
-        t = InfiniteLoopThread(func=lambda: self.handle_worker_messages(timeout=2),
-                               thread_name="WORKERMESSAGEHANDLER",
-                               wait_between_runs=0.5)
+        t = InfiniteLoopThread(
+            func=lambda: self.handle_worker_messages(timeout=2),
+            thread_name="WORKERMESSAGEHANDLER",
+            wait_between_runs=0.5)
         t.start()
         return t
 
@@ -76,10 +81,14 @@ class Scheduler(object):
 
         try:
             self.messaging_backend.send(self.worker_mailbox,
-                                        Message(type=MessageType.START_JOB, message={'job': next_job}))
+                                        Message(
+                                            type=MessageType.START_JOB,
+                                            message={'job': next_job}))
             self.storage_backend.mark_job_as_queued(next_job.job_id)
         except Full:
-            logging.debug("Worker queue full; skipping scheduling of job {} for now.".format(next_job.job_id))
+            logging.debug(
+                "Worker queue full; skipping scheduling of job {} for now.".
+                format(next_job.job_id))
             return
 
     def handle_worker_messages(self, timeout):
@@ -94,7 +103,8 @@ class Scheduler(object):
 
         """
         try:
-            msg = self.messaging_backend.pop(self.incoming_mailbox, timeout=timeout)
+            msg = self.messaging_backend.pop(
+                self.incoming_mailbox, timeout=timeout)
         except Empty:
             logging.debug("No new messages from workers.")
             return
@@ -105,7 +115,8 @@ class Scheduler(object):
         if msg.type == MessageType.JOB_UPDATED:
             progress = actual_msg['progress']
             total_progress = actual_msg['total_progress']
-            self.storage_backend.update_job_progress(job_id, progress, total_progress)
+            self.storage_backend.update_job_progress(job_id, progress,
+                                                     total_progress)
         elif msg.type == MessageType.JOB_COMPLETED:
             self.storage_backend.complete_job(job_id)
         elif msg.type == MessageType.JOB_FAILED:

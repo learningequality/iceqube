@@ -47,20 +47,31 @@ class ORMJob(Base):
     time_created = Column(DateTime(timezone=True), server_default=func.now())
     time_updated = Column(DateTime(timezone=True), server_onupdate=func.now())
 
-    __table_args__ = (Index('app_namespace_index', 'app', 'namespace'),)
+    __table_args__ = (Index('app_namespace_index', 'app', 'namespace'), )
 
 
 class StorageBackend(BaseBackend):
-    def __init__(self, app, namespace, *args, **kwargs):
+    # constant for specifying an in-memory DB
+    MEMORY = 1
+
+    def __init__(self, app, namespace, storage_path, *args, **kwargs):
         self.app = app
         self.namespace = namespace
         self.namespace_id = uuid.uuid5(uuid.NAMESPACE_DNS, app + namespace).hex
 
-        self.engine = create_engine('sqlite:///:memory:', connect_args={'check_same_thread': False},
-                                    poolclass=StaticPool)
+        if storage_path == self.MEMORY:
+            storage_path = "sqlite:///:memory:"
+            connection_class = StaticPool
+        else:
+            storage_path = "sqlite:///{path}".format(path=storage_path)
+            connection_class = QueuePool
+
+        self.engine = create_engine(
+            storage_path,
+            connect_args={'check_same_thread': False},
+            poolclass=connection_class)
         Base.metadata.create_all(self.engine)
         self.sessionmaker = sessionmaker(bind=self.engine)
-        self.hack_hack_hack_now_has_scheduled_job = Event()
 
         # create the tables if they don't exist yet
         super(StorageBackend, self).__init__(*args, **kwargs)
@@ -75,13 +86,18 @@ class StorageBackend(BaseBackend):
         j.job_id = job_id
 
         session = self.sessionmaker()
-        orm_job = ORMJob(id=job_id, state=j.state, app=self.app, namespace=self.namespace, obj=j)
+        orm_job = ORMJob(
+            id=job_id,
+            state=j.state,
+            app=self.app,
+            namespace=self.namespace,
+            obj=j)
         session.add(orm_job)
         try:
             session.commit()
         except Exception as e:
-            logging.error("Got an error running session.commit(): {}".format(e))
-        self.hack_hack_hack_now_has_scheduled_job.set()
+            logging.error(
+                "Got an error running session.commit(): {}".format(e))
 
         return job_id
 
@@ -104,7 +120,8 @@ class StorageBackend(BaseBackend):
 
     def get_next_scheduled_job(self):
         s = self.sessionmaker()
-        orm_job = self._ns_query(s).filter_by(state=State.SCHEDULED).order_by(ORMJob.queue_order).first()
+        orm_job = self._ns_query(s).filter_by(
+            state=State.SCHEDULED).order_by(ORMJob.queue_order).first()
         s.close()
         if orm_job:
             job = orm_job.obj
@@ -138,14 +155,16 @@ class StorageBackend(BaseBackend):
         if job_id:
             q = q.filter_by(id=job_id)
 
-        q = q.filter(or_(ORMJob.state == State.COMPLETED, ORMJob.state == State.FAILED))
+        q = q.filter(
+            or_(ORMJob.state == State.COMPLETED, ORMJob.state == State.FAILED))
         q.delete(synchronize_session=False)
         s.commit()
         s.close()
 
     def update_job_progress(self, job_id, progress, total_progress):
         session = self.sessionmaker()
-        job, orm_job = self._update_job_state(job_id, state=State.RUNNING, session=session)
+        job, orm_job = self._update_job_state(
+            job_id, state=State.RUNNING, session=session)
 
         # Note (aron): looks like SQLAlchemy doesn't automatically
         # save any pickletype fields even if we re-set (orm_job.obj = job) that
@@ -189,7 +208,8 @@ class StorageBackend(BaseBackend):
 
         """
         session = self.sessionmaker()
-        job, orm_job = self._update_job_state(job_id, State.FAILED, session=session)
+        job, orm_job = self._update_job_state(
+            job_id, State.FAILED, session=session)
 
         # Note (aron): looks like SQLAlchemy doesn't automatically
         # save any pickletype fields even if we re-set (orm_job.obj = job) that
@@ -251,4 +271,5 @@ class StorageBackend(BaseBackend):
         Returns: a SQLAlchemy query object
 
         """
-        return session.query(ORMJob).filter(ORMJob.app == self.app, ORMJob.namespace == self.namespace)
+        return session.query(ORMJob).filter(ORMJob.app == self.app,
+                                            ORMJob.namespace == self.namespace)

@@ -27,7 +27,7 @@ def inmem_worker_backend():
 
 @pytest.fixture
 def inmem_client():
-    c = InMemClient('pytest', 'inmem_test')
+    c = InMemClient('pytest')
     yield c
     c.shutdown()
 
@@ -124,7 +124,8 @@ def make_job_updates(flag, update_progress):
 
 
 def failing_func():
-    raise Exception("Test function failing_func has failed as it's supposed to.")
+    raise Exception(
+        "Test function failing_func has failed as it's supposed to.")
 
 
 class TestClient(object):
@@ -160,7 +161,8 @@ class TestClient(object):
             assert e.wait(timeout=1)
 
     def test_scheduled_job_can_receive_job_updates(self, inmem_client, flag):
-        job_id = inmem_client.schedule(make_job_updates, flag, track_progress=True)
+        job_id = inmem_client.schedule(
+            make_job_updates, flag, track_progress=True)
 
         for i in range(2):
             inmem_client._storage.wait_for_job_update(job_id, timeout=2)
@@ -181,8 +183,7 @@ class TestClient(object):
 
     def test_can_get_job_details(self, inmem_client, scheduled_job):
         assert inmem_client.status(
-            scheduled_job.job_id
-        ).job_id == scheduled_job.job_id
+            scheduled_job.job_id).job_id == scheduled_job.job_id
 
     def test_can_cancel_a_job(self, inmem_client, scheduled_job):
         inmem_client.cancel(scheduled_job.job_id)
