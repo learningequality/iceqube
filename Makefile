@@ -30,4 +30,4 @@ pubsubemulator:
 	gcloud beta emulators pubsub start
 
 simpletest:
-	pip install --upgrade . && pytest --pdb
+	pip install --upgrade . && pytest
