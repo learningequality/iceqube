@@ -8,14 +8,13 @@ import sys
 
 from setuptools import find_packages, setup
 
-sys.path.append(
-    os.path.join(os.path.dirname(__file__), 'src')
-)
+sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
 # noqa
 from barbequeue import __version__  # isort:skip  # noqa
 
-IS_PYTHON_2 = sys.version_info < (3,)
+IS_PYTHON_2 = sys.version_info < (3, )
+
 
 def read_file(fname):
     """
@@ -54,13 +53,8 @@ def enable_log_to_stdout(logname):
 INSTALL_REQUIRES = [
     'six',
     "SQLAlchemy>=1.1.0",
-]
-
-PYTHON_2_BACKPORTS = [
     "futures>=3.1.1",
 ]
-
-INSTALL_REQUIRES += PYTHON_2_BACKPORTS if IS_PYTHON_2 else []
 
 setup(
     name=dist_name,
@@ -90,5 +84,4 @@ setup(
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: Implementation :: PyPy',
-    ],
-)
+    ], )
