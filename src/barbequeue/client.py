@@ -1,6 +1,6 @@
 import uuid
 
-from barbequeue.common.classes import Job
+from barbequeue.common.classes import Job, State
 from barbequeue.messaging.backends import inmem as messaging_inmem
 from barbequeue.scheduler.classes import Scheduler
 from barbequeue.storage.backends import inmem as storage_inmem
@@ -72,6 +72,32 @@ class Client(object):
         :return: the Job object corresponding to the job_id
         """
         return self.storage.get_job(job_id)
+
+    def wait(self, job_id, timeout=None):
+        """
+        Wait until the job given by job_id has a new update.
+
+        :param job_id: the id of the job to wait for. 
+        :param timeout: how long to wait for a job state change before timing out.
+        :return: Job object corresponding to job_id
+        """
+        return self.storage.wait_for_job_update(job_id, timeout=timeout)
+
+    def wait_for_completion(self, job_id, timeout=None):
+        """
+        Wait for the job given by job_id to change to COMPLETED or CANCELED. Raises a
+        barbequeue.exceptions.TimeoutError if timeout is exceeded before each job change.
+
+        :param job_id: the id of the job to wait for. 
+        :param timeout: how long to wait for a job state change before timing out.
+        """
+        while 1:
+            job = self.wait(job_id, timeout=timeout)
+            if job.state in [State.COMPLETED, State.FAILED]:
+                break
+            else:
+                continue
+            return job
 
     def clear(self):
         """
