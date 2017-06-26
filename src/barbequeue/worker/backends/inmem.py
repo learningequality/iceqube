@@ -1,7 +1,5 @@
 import traceback
 
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
-
 from barbequeue.worker.backends.base import BaseWorkerBackend
 
 
@@ -46,8 +44,10 @@ class WorkerBackend(BaseWorkerBackend):
 
     def start_workers(self, num_workers):
         if self.worker_type == self.PROCESS:
+            from concurrent.futures import ProcessPoolExecutor
             worker_executor = ProcessPoolExecutor
         elif self.worker_type == self.THREAD:
+            from concurrent.futures import ThreadPoolExecutor
             worker_executor = ThreadPoolExecutor
         else:
             raise ValueError(
