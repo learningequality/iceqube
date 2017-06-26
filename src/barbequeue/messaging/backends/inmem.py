@@ -2,14 +2,14 @@ import logging
 import time
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
-from ...common.compat import queue
+from six.moves.queue import Empty, Queue
 
 logger = logging.getLogger(__name__)
 
-INMEM_SUPER_MAILBOX = defaultdict(lambda: queue.Queue())
+INMEM_SUPER_MAILBOX = defaultdict(lambda: Queue())
 
 
-class BaseBackend(object):
+class BaseMessagingBackend(object):
     __metaclass__ = ABCMeta
 
     @abstractmethod
@@ -29,7 +29,7 @@ class BaseBackend(object):
         pass
 
     @abstractmethod
-    def pop(self, mailbox):
+    def pop(self, mailbox, timeout=None):
         pass
 
     @abstractmethod
@@ -41,7 +41,7 @@ class BaseBackend(object):
         pass
 
 
-class Backend(BaseBackend):
+class MessagingBackend(BaseMessagingBackend):
     def __init__(self, *args, **kwargs):
         pass
 
@@ -59,7 +59,7 @@ class Backend(BaseBackend):
 
                 return True
             elif timeout <= 0:  # we've gone past our alloted timeout, so raise an error
-                raise queue.Empty
+                raise Empty("Queue currently empty.")
             else:
                 time.sleep(timeout_increment)
                 timeout -= timeout_increment

@@ -1,8 +1,10 @@
-import logging
+from threading import Event
+
 import pytest
 
 from barbequeue.common.classes import Job
-from barbequeue.messaging.classes import Message, MessageType
+from barbequeue.messaging.backends.inmem import MessagingBackend
+from barbequeue.messaging.classes import MessageType
 from barbequeue.worker.backends import inmem
 
 
@@ -12,60 +14,46 @@ def mailbox():
 
 
 @pytest.fixture
-def worker(mailbox):
-    logging.info("test_inmem.worker() working")
-    b = inmem.Backend(incoming_message_mailbox=mailbox, outgoing_message_mailbox=mailbox)
+def msgbackend():
+    return MessagingBackend()
+
+
+@pytest.fixture
+def worker(mailbox, msgbackend):
+    b = inmem.WorkerBackend(incoming_message_mailbox=mailbox, outgoing_message_mailbox=mailbox, msgbackend=msgbackend)
     yield b
     b.shutdown()
 
 
-@pytest.fixture
-def startmsg(job):
-    msg = Message(type=MessageType.START_JOB, message={"job": job})
-    return msg
-
-
-@pytest.fixture
-def simplejob():
-    logging.info("simplejob spawning a Job")
-    job = Job(id, 'test', job_id='simplejob')
-    return job
-
-
-ID_SET = None
-
-
-def testfunc(val=None):
-    global ID_SET
-    ID_SET = val
-
-
-@pytest.fixture
-def job():
-    global ID_SET
-    test_func_name = "{module}.{func}".format(module=__name__, func="testfunc")
-    yield Job(test_func_name, job_id="test", val="passme")
-    ID_SET = None  # reset the value set by testfunc
+def set_flag(threading_flag):
+    threading_flag.set()
 
 
 class TestWorker:
-    def test_successful_job_adds_to_report_queue(self, worker, simplejob, mocker):
-        mocker.spy(worker.reportqueue, 'put')
+    def test_schedule_job_runs_job(self, worker):
+        flag = Event()
+        job = Job(set_flag, flag)
+        worker.schedule_job(job)
 
-        logging.info("TestWorker starting simplejob...")
-        worker.start_job(simplejob)
-        logging.info("TestWorker joining jobqueue...")
-        worker.jobqueue.join()
+        assert flag.wait(timeout=2)
 
-        assert worker.reportqueue.put.call_count == 1
-        assert simplejob == worker.reportqueue.put.call_args[0][0].message.get('job')
+    def test_schedule_job_sends_message_on_success(self, worker, mocker):
+        mocker.spy(worker.msgbackend, 'send')
 
+        # this job should never fail.
+        job = Job(id, 9)
+        future = worker.schedule_job(job)
+        # wait for the result to finish
+        future.result()
 
-class TestMonitor:
-    def test_handle_messages_start_message_starts_a_job(self, worker, startmsg, job, mocker):
-        mocker.spy(worker.monitor_thread, 'start_job')
-        worker.monitor_thread.handle_incoming_message(startmsg)
+        # verify that we sent a message through our backend
+        assert worker.msgbackend.send.call_count == 1
 
-        start_job = worker.monitor_thread.start_job
-        assert start_job.call_count == 1
-        assert startmsg.message['job'] in start_job.call_args[0]
+        # verify that we passed in a success message,
+        # that includes the job_id, and the result
+        call_args = worker.msgbackend.send.call_args
+        message = call_args[0][1]
+        assert message.type == MessageType.JOB_COMPLETED
+        assert message.message['result'] == future.result()
+        # verify that we're sending the job_id in the message
+        assert message.message['job_id'] == job.job_id

@@ -7,19 +7,21 @@ from barbequeue.messaging.classes import Message, MessageType
 
 @pytest.fixture
 def defaultbackend():
-    b = inmem.Backend()
+    b = inmem.MessagingBackend()
     yield b
 
 
 @pytest.fixture
 def otherbackend():
-    b = inmem.Backend()
+    b = inmem.MessagingBackend()
     yield b
 
 
 @pytest.fixture
 def msg():
-    msgtype = random.choice(list(MessageType))
+    msg_types = [MessageType.JOB_FAILED, MessageType.JOB_STARTED, MessageType.JOB_UPDATED,
+                 MessageType.JOB_COMPLETED, MessageType.START_JOB, MessageType.CANCEL_JOB]
+    msgtype = random.choice(msg_types)
     m = Message(msgtype, "doesntmatter")
     yield m
 

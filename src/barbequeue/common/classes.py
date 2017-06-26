@@ -1,116 +1,117 @@
-import abc
-import enum
-import importlib
 import logging
-import threading
-from collections import namedtuple
+from functools import partial
 
-from barbequeue import humanhash
-from barbequeue.common import compat
+from barbequeue.common.utils import import_stringified_func, stringify_func
 
 logger = logging.getLogger(__name__)
 
+class State(object):
+    """
+    the State object enumerates a Job's possible valid states.
+
+    SCHEDULED means the Job has been accepted by the client, but has not been
+    sent to the workers for running.
+
+    QUEUED means the Job has been sent to the workers for running, but has not
+    been run yet (to our knowledge).
+
+    RUNNING means that one of the workers has started running the job, but is not
+    complete yet. If the job has been set to track progress, then the job's progress
+    and total_progress fields should be continuously updated.
+
+    FAILED means that the job's function has raised an exception during runtime.
+    The job's exception and traceback fields should be set.
+
+    CANCELED means that the job has been canceled from running.
+
+    COMPLETED means that the function has run to completion. The job's result field
+    should be set with the function's return value.
+    """
+
+    SCHEDULED = "SCHEDULED"
+    QUEUED = "QUEUED"
+    RUNNING = "RUNNING"
+    FAILED = "FAILED"
+    CANCELED = "CANCELED"
+    COMPLETED = "COMPLETED"
+
 
 class Job(object):
-    class State(enum.Enum):
-        SCHEDULED = 0
-        # STARTED = 1
-        RUNNING = 2
-        FAILED = 3
-        CANCELED = 4
-        COMPLETED = 5
+    """
+    Job represents a function whose execution has been deferred through the Client's schedule function.
 
-    def __init__(self, func_string, *args, **kwargs):
+    Jobs are stored on the storage backend for persistence through restarts, and are scheduled for running
+    to the workers.
+    """
+    def __init__(self, func, *args, **kwargs):
+        """
+        Create a new Job that will run func given the arguments passed to Job(). If the track_progress keyword parameter
+        is given, the worker will pass an update_progress function to update interested parties about the function's
+        progress. See Client.__doc__ for update_progress's function parameters.
+
+        :param func: func can be a callable object, in which case it is turned into an importable string,
+        or it can be an importable string already.
+        """
         self.job_id = kwargs.pop('job_id', None)
-        self.state = kwargs.pop('state', self.State.SCHEDULED)
-        self.func = func_string
-        self.traceback = kwargs.pop('traceback', '')
-        self.exception = kwargs.pop('exception', '')
+        self.state = kwargs.pop('state', State.SCHEDULED)
+        self.traceback = ""
+        self.exception = None
+        self.track_progress = kwargs.pop('track_progress', False)
+        self.progress = 0
+        self.total_progress = 0
         self.args = args
         self.kwargs = kwargs
 
+        if callable(func):
+            funcstring = stringify_func(func)
+        elif isinstance(func, str):
+            funcstring = func
+        else:
+            raise Exception(
+                "Error in creating job. We do not know how to "
+                "handle a function of type {}".format(type(func)))
+
+        self.func = funcstring
+
     def get_lambda_to_execute(self):
-        if not isinstance(self.func, str):
-            return self.func
-        fqn = self.func
-        modulename, funcname = fqn.rsplit('.', 1)
-        mod = importlib.import_module(modulename)
-        assert hasattr(
-            mod, funcname), \
-            "Module {} does not have attribute {}".format(
-                mod, funcname)
+        """
+        return a function that executes the function assigned to this job.
+        
+        If job.track_progress is None (the default), the returned function accepts no argument
+        and simply needs to be called. If job.track_progress is True, an update_progress function
+        is passed in that can be used by the function to provide feedback progress back to the
+        job scheduling system.
+        
+        :return: a function that executes the original function assigned to this job.
+        """
+        func = import_stringified_func(self.func)
 
-        func = getattr(mod, funcname)
+        if self.track_progress:
+            y = lambda p: func(update_progress=partial(p, self.job_id), *self.args, **self.kwargs)
+        else:
+            y = lambda: func(*self.args, **self.kwargs)
 
-        y = lambda: func(*self.args, **self.kwargs)
         return y
 
-    def serialize(self):
-        pass
-
-
-class ProgressData(namedtuple("_ProgressData", ["id", "order", "data"])):
-    pass
-
-
-class Function(namedtuple("_Function", ["module", "funcname"])):
-    def serialize(self):
-        # Since this is all in memory, there is no need to serialize anything.
-        raise NotImplementedError()
-
-
-class BaseCloseableThread(threading.Thread):
-    """
-    A base class for a thread that monitors an Event as a signal for shutting down, and a main_loop that otherwise loop
-     until the shutdown event is received.
-    """
-    __metaclass__ = abc.ABCMeta
-
-    DEFAULT_TIMEOUT_SECONDS = 0.2
-
-    def __init__(self, shutdown_event, thread_name, *args, **kwargs):
-        assert isinstance(shutdown_event, compat.Event)
-
-        self.shutdown_event = shutdown_event
-        self.thread_name = thread_name
-        self.thread_id = self._generate_thread_id()
-        self.logger = logging.getLogger("{module}.{name}[{id}]".format(module=__name__,
-                                                                       name=self.thread_name,
-                                                                       id=self.thread_id))
-        self.full_thread_name = "{thread_name}-{thread_id}".format(thread_name=self.thread_name,
-                                                                   thread_id=self.thread_id)
-        super(BaseCloseableThread, self).__init__(name=self.full_thread_name, *args, **kwargs)
-
-    def run(self):
-        self.logger.info("Started new {name} thread ID#{id}".format(name=self.thread_name,
-                                                                    id=self.thread_id))
-
-        while True:
-            if self.shutdown_event.wait(self.DEFAULT_TIMEOUT_SECONDS):
-                self.logger.warning("{name} shut down event received; closing.".format(name=self.thread_name))
-                self.shutdown()
-                break
-            else:
-                self.main_loop(timeout=self.DEFAULT_TIMEOUT_SECONDS)
-                continue
-
-    @abc.abstractmethod
-    def main_loop(self, timeout):
+    @property
+    def percentage_progress(self):
         """
-        The main loop of a thread. Run this loop if we haven't received any shutdown events in the last 
-        timeout seconds. Normally this is used to read from a queue; you are encouraged to return from 
-        this function if the timeout parameter has elapsed, to allow the thread to continue to check
-        for the shutdown event.
-        :param timeout: a parameter determining how long you can wait for a timeout.
-        :return: None
+        Returns a float between 0 and 1, representing the current job's progress in its task.
+        If total_progress is not given or 0, just return self.progress.
+        
+        :return: float corresponding to the total percentage progress of the job.
         """
-        pass
 
-    @staticmethod
-    def _generate_thread_id():
-        uid, _ = humanhash.uuid()
-        return uid
+        if self.total_progress != 0:
+            return float(self.progress) / self.total_progress
+        else:
+            return self.progress
 
-    def shutdown(self):
-        # stub method, override if you need a more complex shut down procedure.
-        pass
+    def __repr__(self):
+        return "<Job id: {id} state: {state} progress: {p}/{total} func: {func}>".format(
+            id=self.job_id,
+            state=self.state,
+            func=self.func,
+            p=self.progress,
+            total=self.total_progress
+        )

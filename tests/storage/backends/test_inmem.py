@@ -1,19 +1,16 @@
 import pytest
 
-from barbequeue.common.classes import Job
+from barbequeue.common.classes import Job, State
+from barbequeue.common.utils import stringify_func
 from barbequeue.storage.backends import inmem
 
 
 @pytest.fixture
 def defaultbackend():
-    backend = inmem.Backend('pytest', 'default')
+    backend = inmem.StorageBackend(
+        'pytest', 'pytest', storage_path=inmem.StorageBackend.MEMORY)
     yield backend
     backend.clear()
-
-
-@pytest.fixture
-def extrabackend():
-    return inmem.Backend('pytest', 'extra')
 
 
 @pytest.fixture
@@ -28,10 +25,10 @@ class TestBackend:
         new_job = defaultbackend.get_job(job_id)
 
         # Does the returned job record the function we set to run?
-        assert str(new_job.func) == str(id)
+        assert str(new_job.func) == stringify_func(id)
 
         # Does the job have the right state (SCHEDULED)?
-        assert new_job.state == Job.State.SCHEDULED
+        assert new_job.state == State.SCHEDULED
 
         # Is the job part of the list of scheduled jobs?
         assert job_id in [
@@ -44,7 +41,7 @@ class TestBackend:
         defaultbackend.cancel_job(job_id)
 
         # is the job marked with the CANCELED state?
-        assert defaultbackend.get_job(job_id).state == Job.State.CANCELED
+        assert defaultbackend.get_job(job_id).state == State.CANCELED
 
         # is the job not part of the list of scheduled jobs
         assert job_id not in [
@@ -62,7 +59,7 @@ class TestBackend:
 
     def test_can_complete_job(self, defaultbackend, simplejob):
         """
-        When we call backend.finish_job, it should mark the job as finished, and
+        When we call backend.complete_job, it should mark the job as finished, and
         remove it from the queue.
         """
 
@@ -72,9 +69,4 @@ class TestBackend:
         job = defaultbackend.get_job(job_id)
 
         # is the job marked as completed?
-        assert job.state == Job.State.COMPLETED
-
-        # is the job not part of the list of scheduled jobs
-        assert job_id not in [
-            j.job_id for j in defaultbackend.get_scheduled_jobs()
-        ]
+        assert job.state == State.COMPLETED
