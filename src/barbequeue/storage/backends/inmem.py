@@ -162,6 +162,17 @@ class StorageBackend(BaseBackend):
         s.close()
 
     def update_job_progress(self, job_id, progress, total_progress):
+        """
+        Update the job given by job_id's progress info.
+        :type total_progress: int
+        :type progress: int
+        :type job_id: str
+        :param job_id: The id of the job to update
+        :param progress: The current progress achieved by the job
+        :param total_progress: The total progress achievable by the job.
+        :return: the job_id
+        """
+
         session = self.sessionmaker()
         job, orm_job = self._update_job_state(
             job_id, state=State.RUNNING, session=session)
