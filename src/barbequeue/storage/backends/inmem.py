@@ -144,19 +144,26 @@ class StorageBackend(BaseBackend):
         s.close()
         return job
 
-    def clear(self, job_id=None):
+    def clear(self, job_id=None, force=False):
         """
         Clear the queue and the job data. If job_id is not given, clear out all
         jobs marked COMPLETED. If job_id is given, clear out the given job's
         data. This function won't do anything if the job's state is not COMPLETED or FAILED.
+        :type job_id: NoneType or str
+        :param job_id: the job_id to clear. If None, clear all jobs.
+        :type force: bool
+        :param force: If True, clear the job (or jobs), even if it hasn't completed or failed.
         """
         s = self.sessionmaker()
         q = self._ns_query(s)
         if job_id:
             q = q.filter_by(id=job_id)
 
-        q = q.filter(
-            or_(ORMJob.state == State.COMPLETED, ORMJob.state == State.FAILED))
+        # filter only by the finished jobs, if we are not specified to force
+        if not force:
+            q = q.filter(
+                or_(ORMJob.state == State.COMPLETED, ORMJob.state == State.FAILED))
+
         q.delete(synchronize_session=False)
         s.commit()
         s.close()
