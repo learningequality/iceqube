@@ -33,6 +33,19 @@ class BaseMessagingBackend(object):
         pass
 
     @abstractmethod
+    def popn(self, mailbox, n=-1):
+        """
+        Pop at most N number of messages from the mailbox without waiting. If n is less than 0, pop all messages
+        it can.
+        :type n: int
+        :type mailbox: str
+        :param mailbox: The mailbox on whose messages to pop from
+        :param n: The number of messages to pop. If less than 0, pop all messages.
+        :return: The list of messages
+        """
+        pass
+
+    @abstractmethod
     def count(self, mailbox):
         pass
 
@@ -68,6 +81,17 @@ class MessagingBackend(BaseMessagingBackend):
         msg = INMEM_SUPER_MAILBOX[mailbox].get(block=True, timeout=timeout)
         logger.debug("POP MAILBOX: {} MSG: {}".format(mailbox, msg))
         return msg
+
+    def popn(self, mailbox, n=-1):
+        m = INMEM_SUPER_MAILBOX[mailbox]
+        messages = []
+        while 1:
+            try:
+                msg = m.get_nowait()
+                messages.append(msg)
+            except Empty:
+                break
+        return messages
 
     def count(self, mailbox):
         return INMEM_SUPER_MAILBOX[mailbox].qsize()

@@ -1,6 +1,7 @@
 import logging
-from six.moves.queue import Empty, Full
 from threading import Event
+
+from six.moves.queue import Full
 
 from barbequeue.common.utils import InfiniteLoopThread
 from barbequeue.messaging.classes import Message, MessageType
@@ -88,7 +89,7 @@ class Scheduler(object):
         except Full:
             logging.debug(
                 "Worker queue full; skipping scheduling of job {} for now.".
-                format(next_job.job_id))
+                    format(next_job.job_id))
             return
 
     def handle_worker_messages(self, timeout):
@@ -102,16 +103,19 @@ class Scheduler(object):
         Returns: None
 
         """
-        try:
-            msg = self.messaging_backend.pop(
-                self.incoming_mailbox, timeout=timeout)
-        except Empty:
-            logging.debug("No new messages from workers.")
-            return
+        msgs = self.messaging_backend.popn(self.incoming_mailbox, n=20)
 
+        for msg in msgs:
+            self.handle_single_message(msg)
+
+    def handle_single_message(self, msg):
+        """
+        Handle one message and modify the job storage appropriately.
+        :param msg: the message to handle
+        :return: None
+        """
         job_id = msg.message['job_id']
         actual_msg = msg.message
-
         if msg.type == MessageType.JOB_UPDATED:
             progress = actual_msg['progress']
             total_progress = actual_msg['total_progress']
