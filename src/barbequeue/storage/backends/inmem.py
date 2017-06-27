@@ -100,22 +100,14 @@ class StorageBackend(BaseBackend):
 
         return job_id
 
-    def cancel_job(self, job_id):
+    def mark_job_as_canceled(self, job_id):
         """
 
         Mark the job as canceled. Does not actually try to cancel a running job.
 
         """
-        raise NotImplementedError
-        # job = self._get_job_nocopy(job_id)
-        #
-        # # Mark the job as canceled.
-        # job.state = State.CANCELED
-        #
-        # # Remove it from the queue.
-        # self.queue.remove(job_id)
-        #
-        # return self.get_job(job)
+        job, _ = self._update_job_state(job_id, State.CANCELED)
+        return job
 
     def get_next_scheduled_job(self):
         s = self.sessionmaker()
@@ -129,7 +121,9 @@ class StorageBackend(BaseBackend):
         return job
 
     def get_scheduled_jobs(self):
-        return [self.get_job(jid) for jid in INMEM_QUEUE[self.namespace_id]]
+        s = self.sessionmaker()
+        jobs = self._ns_query(s).filter_by(state=State.SCHEDULED).order_by(ORMJob.queue_order)
+        return [job.obj for job in jobs]
 
     def get_all_jobs(self):
         s = self.sessionmaker()

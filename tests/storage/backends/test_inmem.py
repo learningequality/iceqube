@@ -38,7 +38,7 @@ class TestBackend:
     def test_can_cancel_nonrunning_job(self, defaultbackend, simplejob):
         job_id = defaultbackend.schedule_job(simplejob)
 
-        defaultbackend.cancel_job(job_id)
+        defaultbackend.mark_job_as_canceled(job_id)
 
         # is the job marked with the CANCELED state?
         assert defaultbackend.get_job(job_id).state == State.CANCELED
