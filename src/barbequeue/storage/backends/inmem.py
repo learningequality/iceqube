@@ -1,13 +1,12 @@
+import logging
 import uuid
 from collections import defaultdict, deque
 from copy import copy
-from threading import Event
 
-import logging
+from sqlalchemy import Column, DateTime, Index, Integer, PickleType, String, create_engine, func, or_
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, Integer, String, PickleType, Boolean, DateTime, func, create_engine, Index, or_
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import QueuePool, AssertionPool, StaticPool
+from sqlalchemy.pool import QueuePool, StaticPool
 
 from barbequeue.common.classes import State
 from barbequeue.storage.backends.default import BaseBackend
@@ -47,7 +46,7 @@ class ORMJob(Base):
     time_created = Column(DateTime(timezone=True), server_default=func.now())
     time_updated = Column(DateTime(timezone=True), server_onupdate=func.now())
 
-    __table_args__ = (Index('app_namespace_index', 'app', 'namespace'), )
+    __table_args__ = (Index('app_namespace_index', 'app', 'namespace'),)
 
 
 class StorageBackend(BaseBackend):
