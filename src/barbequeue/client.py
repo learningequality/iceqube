@@ -99,11 +99,13 @@ class Client(object):
                 continue
             return job
 
-    def clear(self):
+    def clear(self, force=False):
         """
         Clear all jobs that have succeeded or failed.
+        :type force: bool
+        :param force: Whether to clear all jobs from the job storage queue, regardless if they've been completed or not.
         """
-        self.storage.clear()
+        self.storage.clear(force=force)
 
 
 class SimpleClient(Client):
