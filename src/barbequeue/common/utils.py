@@ -1,4 +1,5 @@
 import abc
+import atexit
 import importlib
 import logging
 import threading
@@ -95,6 +96,10 @@ class InfiniteLoopThread(BaseCloseableThread):
         self.func = func
         self.wait = wait_between_runs
         self.daemon = True
+
+        # let's register a shutdown function to make sure it shuts down
+        # before the python interpreter can continue.
+        atexit.register(self.stop)
 
     def main_loop(self, timeout):
         try:
