@@ -56,7 +56,6 @@ class StorageBackend(BaseBackend):
     def __init__(self, app, namespace, storage_path, *args, **kwargs):
         self.app = app
         self.namespace = namespace
-        self.namespace_id = uuid.uuid5(uuid.NAMESPACE_DNS, app + namespace).hex
 
         if storage_path == self.MEMORY:
             storage_path = "sqlite:///:memory:"
