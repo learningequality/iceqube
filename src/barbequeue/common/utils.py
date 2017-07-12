@@ -4,7 +4,7 @@ import logging
 import threading
 import time
 
-from six.moves import _thread as thread
+from barbequeue.common.six.moves import _thread as thread
 
 from barbequeue import humanhash
 
