@@ -30,8 +30,12 @@ class BaseWorkerBackend(object):
         pass
 
     @abstractmethod
-    def shutdown(self, wait):
+    def shutdown_workers(self, wait):
         pass
+
+    def shutdown(self, wait=False):
+        self.message_processor.stop()
+        self.shutdown_workers(wait=wait)
 
     def start_message_processing(self):
         """

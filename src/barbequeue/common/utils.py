@@ -1,9 +1,10 @@
 import abc
-import atexit
 import importlib
 import logging
 import threading
 import time
+
+from six.moves import _thread as thread
 
 from barbequeue import humanhash
 
@@ -53,8 +54,7 @@ class BaseCloseableThread(threading.Thread):
         while True:
             if self.shutdown_event.wait(self.DEFAULT_TIMEOUT_SECONDS):
                 self.logger.warning("{name} shut down event received; closing.".format(name=self.thread_name))
-                self.shutdown()
-                break
+                thread.exit()
             else:
                 self.main_loop(timeout=self.DEFAULT_TIMEOUT_SECONDS)
                 continue
@@ -95,11 +95,6 @@ class InfiniteLoopThread(BaseCloseableThread):
         super(InfiniteLoopThread, self).__init__(thread_name=thread_name, shutdown_event=self.shutdown_event)
         self.func = func
         self.wait = wait_between_runs
-        self.daemon = True
-
-        # let's register a shutdown function to make sure it shuts down
-        # before the python interpreter can continue.
-        atexit.register(self.stop)
 
     def main_loop(self, timeout):
         try:
@@ -111,3 +106,42 @@ class InfiniteLoopThread(BaseCloseableThread):
 
     def stop(self):
         self.shutdown_event.set()
+
+    def shutdown(self):
+        self.stop()
+
+
+class EventWaitingThread(BaseCloseableThread):
+    """
+    A thread class that waits for a threading.Event class passed to it to be set, and then runs the function passed
+    to it.
+    """
+
+    def __init__(self, func, thread_name, trigger_event=None):
+
+        self.shutdown_event = threading.Event()
+        super(EventWaitingThread, self).__init__(thread_name=thread_name, shutdown_event=self.shutdown_event)
+
+        self.func = func
+        self.trigger_event = trigger_event
+
+    def main_loop(self, timeout=None):
+        """
+        Check if self.trigger_event is set. If it is, then run our function. If not, return early.
+        :param timeout: How long to wait for a trigger event. Defaults to 0.
+        :return:
+        """
+        if self.trigger_event.wait(timeout):
+            try:
+                self.func()
+            except Exception as e:
+                self.logger.warning("Got an exception running {func}: {e}".format(func=self.func, e=str(e)))
+            finally:
+                self.trigger_event.clear()
+
+    def trigger(self):
+        """
+        Convenience function for setting the trigger event.
+        :return: None
+        """
+        self.trigger_event.set()
