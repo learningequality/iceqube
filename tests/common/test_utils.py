@@ -27,3 +27,4 @@ class TestBaseCloseableThread(object):
             t = InfiniteLoopThread(lambda: id(1), thread_name='test')
             t.start()
             time.sleep(1)
+        t.shutdown()

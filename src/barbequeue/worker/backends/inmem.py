@@ -39,7 +39,7 @@ class WorkerBackend(BaseWorkerBackend):
 
         return future
 
-    def shutdown(self, wait=True):
+    def shutdown_workers(self, wait=True):
         self.workers.shutdown(wait=wait)
 
     def start_workers(self, num_workers):

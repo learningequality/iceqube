@@ -4,7 +4,7 @@ from threading import Event
 import pytest
 import tempfile
 
-from barbequeue.client import Client, InMemClient
+from barbequeue.client import Client, InMemClient, SimpleClient
 from barbequeue.common.classes import Job, State
 from barbequeue.common.utils import import_stringified_func, stringify_func
 from barbequeue.storage.backends import inmem
@@ -13,23 +13,17 @@ from barbequeue.worker.backends import inmem as worker_inmem
 
 @pytest.fixture
 def backend():
-    b = inmem.StorageBackend(app="pytest", namespace="test")
-    yield b
-    b.clear()
-
-
-# ARON: initialize the workers and the scheduler. We might need a shortcut function for that
-@pytest.fixture
-def inmem_worker_backend():
-    w = worker_inmem.WorkerBackend()
-    pass
-
+    with tempfile.NamedTemporaryFile() as f:
+        b = inmem.StorageBackend(app="pytest", namespace="test", storage_path=f.name)
+        yield b
+        b.clear()
 
 @pytest.fixture
 def inmem_client():
-    c = InMemClient('pytest')
-    yield c
-    c.shutdown()
+    with tempfile.NamedTemporaryFile() as f:
+        c = SimpleClient(app="pytest", storage_path=f.name)
+        yield c
+        c.shutdown()
 
 
 @pytest.fixture

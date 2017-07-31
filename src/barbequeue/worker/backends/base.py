@@ -2,7 +2,7 @@ import traceback
 from abc import ABCMeta, abstractmethod
 
 import logging
-from six.moves import queue
+from barbequeue.common.six.moves import queue
 
 from barbequeue.common.utils import InfiniteLoopThread
 from barbequeue.messaging.classes import MessageType, ProgressMessage, SuccessMessage, FailureMessage
@@ -30,8 +30,12 @@ class BaseWorkerBackend(object):
         pass
 
     @abstractmethod
-    def shutdown(self, wait):
+    def shutdown_workers(self, wait):
         pass
+
+    def shutdown(self, wait=False):
+        self.message_processor.stop()
+        self.shutdown_workers(wait=wait)
 
     def start_message_processing(self):
         """

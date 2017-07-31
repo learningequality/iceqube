@@ -97,7 +97,6 @@ class Client(object):
                 break
             else:
                 continue
-            return job
 
     def clear(self, force=False):
         """
@@ -149,8 +148,8 @@ class SimpleClient(Client):
         :return: None
         """
         self._storage.clear()
-        self._scheduler.shutdown()
-        self._workers.shutdown()
+        self._scheduler.shutdown(wait=False)
+        self._workers.shutdown(wait=False)
 
 
 class InMemClient(SimpleClient):

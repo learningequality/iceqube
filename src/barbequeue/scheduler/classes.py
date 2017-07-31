@@ -1,7 +1,7 @@
 import logging
 from threading import Event
 
-from six.moves.queue import Full
+from barbequeue.common.six.moves.queue import Full
 
 from barbequeue.common.utils import InfiniteLoopThread
 from barbequeue.messaging.classes import Message, MessageType
@@ -19,8 +19,7 @@ class Scheduler(object):
         self.messaging_backend = messaging_backend
 
         self.scheduler_thread = self.start_scheduler()
-        self.worker_message_handler_thread = self.start_worker_message_handler(
-        )
+        self.worker_message_handler_thread = self.start_worker_message_handler()
 
     def start_scheduler(self):
         """
