@@ -3,7 +3,7 @@ import uuid
 from collections import defaultdict, deque
 from copy import copy
 
-from sqlalchemy import Column, DateTime, Index, Integer, PickleType, String, create_engine, func, or_
+from sqlalchemy import Column, DateTime, Index, Integer, PickleType, String, create_engine, func, or_, event
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import QueuePool, StaticPool
@@ -68,11 +68,26 @@ class StorageBackend(BaseBackend):
             storage_path,
             connect_args={'check_same_thread': False},
             poolclass=connection_class)
+        self.set_sqlite_pragmas()
         Base.metadata.create_all(self.engine)
         self.sessionmaker = sessionmaker(bind=self.engine)
 
         # create the tables if they don't exist yet
         super(StorageBackend, self).__init__(*args, **kwargs)
+
+    def set_sqlite_pragmas(self):
+        """
+        Sets the connection PRAGMAs for the sqlalchemy engine stored in self.engine.
+
+        It currently sets:
+        - journal_mode to WAL
+
+        :return: None
+        """
+        def _pragmas_on_connect(dbapi_con, con_record):
+            dbapi_con.execute("PRAGMA journal_mode = WAL;")
+
+        event.listen(self.engine, "connect", _pragmas_on_connect)
 
     def schedule_job(self, j):
         """
@@ -199,7 +214,7 @@ class StorageBackend(BaseBackend):
     def mark_job_as_queued(self, job_id):
         """
         Change the job given by job_id to QUEUED.
-        
+
         :param job_id: the job to be marked as QUEUED.
         :return: None
         """
