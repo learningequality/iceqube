@@ -78,7 +78,7 @@ class Client(object):
         """
         Wait until the job given by job_id has a new update.
 
-        :param job_id: the id of the job to wait for. 
+        :param job_id: the id of the job to wait for.
         :param timeout: how long to wait for a job state change before timing out.
         :return: Job object corresponding to job_id
         """
@@ -89,7 +89,7 @@ class Client(object):
         Wait for the job given by job_id to change to COMPLETED or CANCELED. Raises a
         barbequeue.exceptions.TimeoutError if timeout is exceeded before each job change.
 
-        :param job_id: the id of the job to wait for. 
+        :param job_id: the id of the job to wait for.
         :param timeout: how long to wait for a job state change before timing out.
         """
         while 1:
@@ -117,7 +117,6 @@ class SimpleClient(Client):
     MEMORY = storage_inmem.StorageBackend.MEMORY
 
     def __init__(self, app, worker_type=THREAD_BASED, storage_path=MEMORY):
-
         # simplify configuration by making app and namespace the same thing
         namespace = app
 
@@ -158,7 +157,7 @@ class InMemClient(SimpleClient):
     A client that starts and runs all jobs in memory. In particular, the following barbequeue components are all
     running
     their in-memory counterparts:
-    
+
     - Scheduler
     - Job storage
     - Workers

@@ -17,6 +17,13 @@ def stringify_func(func):
 
 
 def import_stringified_func(funcstring):
+    """
+    Import a string that represents a module and function, e.g. {module}.{funcname}.
+
+    Given a function f, import_stringified_func(stringify_func(f)) will return the same function.
+    :param funcstring: String to try to import
+    :return: callable
+    """
     assert isinstance(funcstring, str)
 
     modulestring, funcname = funcstring.rsplit('.', 1)
@@ -62,8 +69,8 @@ class BaseCloseableThread(threading.Thread):
     @abc.abstractmethod
     def main_loop(self, timeout):
         """
-        The main loop of a thread. Run this loop if we haven't received any shutdown events in the last 
-        timeout seconds. Normally this is used to read from a queue; you are encouraged to return from 
+        The main loop of a thread. Run this loop if we haven't received any shutdown events in the last
+        timeout seconds. Normally this is used to read from a queue; you are encouraged to return from
         this function if the timeout parameter has elapsed, to allow the thread to continue to check
         for the shutdown event.
         :param timeout: a parameter determining how long you can wait for a timeout.

@@ -3,7 +3,7 @@ import uuid
 from collections import defaultdict, deque
 from copy import copy
 
-from sqlalchemy import Column, DateTime, Index, Integer, PickleType, String, create_engine, func, or_, event
+from sqlalchemy import Column, DateTime, Index, Integer, PickleType, String, create_engine, event, func, or_
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import QueuePool, StaticPool
@@ -84,6 +84,7 @@ class StorageBackend(BaseBackend):
 
         :return: None
         """
+
         def _pragmas_on_connect(dbapi_con, con_record):
             dbapi_con.execute("PRAGMA journal_mode = WAL;")
 
