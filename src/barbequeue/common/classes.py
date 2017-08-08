@@ -1,9 +1,11 @@
+import copy
 import logging
 from functools import partial
 
 from barbequeue.common.utils import import_stringified_func, stringify_func
 
 logger = logging.getLogger(__name__)
+
 
 class State(object):
     """
@@ -43,6 +45,7 @@ class Job(object):
     Jobs are stored on the storage backend for persistence through restarts, and are scheduled for running
     to the workers.
     """
+
     def __init__(self, func, *args, **kwargs):
         """
         Create a new Job that will run func given the arguments passed to Job(). If the track_progress keyword parameter
@@ -57,6 +60,7 @@ class Job(object):
         self.traceback = ""
         self.exception = None
         self.track_progress = kwargs.pop('track_progress', False)
+        self.cancellable = kwargs.pop('cancellable', False)
         self.progress = 0
         self.total_progress = 0
         self.args = args
@@ -76,20 +80,30 @@ class Job(object):
     def get_lambda_to_execute(self):
         """
         return a function that executes the function assigned to this job.
-        
+
         If job.track_progress is None (the default), the returned function accepts no argument
         and simply needs to be called. If job.track_progress is True, an update_progress function
         is passed in that can be used by the function to provide feedback progress back to the
         job scheduling system.
-        
+
         :return: a function that executes the original function assigned to this job.
         """
         func = import_stringified_func(self.func)
 
-        if self.track_progress:
-            y = lambda p: func(update_progress=partial(p, self.job_id), *self.args, **self.kwargs)
-        else:
-            y = lambda: func(*self.args, **self.kwargs)
+        def y(update_progress_func, cancel_job_func):
+            extrafunckwargs = {}
+
+            args, kwargs = copy.copy(self.args), copy.copy(self.kwargs)
+
+            if self.track_progress:
+                extrafunckwargs["update_progress"] = partial(update_progress_func, self.job_id)
+
+            if self.cancellable:
+                extrafunckwargs["cancel"] = partial(cancel_job_func, self.job_id)
+
+            kwargs.update(extrafunckwargs)
+
+            return func(*args, **kwargs)
 
         return y
 
@@ -98,7 +112,7 @@ class Job(object):
         """
         Returns a float between 0 and 1, representing the current job's progress in its task.
         If total_progress is not given or 0, just return self.progress.
-        
+
         :return: float corresponding to the total percentage progress of the job.
         """
 

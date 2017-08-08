@@ -1,13 +1,14 @@
+import logging
 import traceback
 from abc import ABCMeta, abstractmethod
 
-import logging
 from barbequeue.common.six.moves import queue
 
 from barbequeue.common.utils import InfiniteLoopThread
-from barbequeue.messaging.classes import MessageType, ProgressMessage, SuccessMessage, FailureMessage
+from barbequeue.messaging.classes import FailureMessage, MessageType, ProgressMessage, SuccessMessage
 
 logger = logging.getLogger(__name__)
+
 
 class BaseWorkerBackend(object):
     __metaclass__ = ABCMeta
@@ -92,3 +93,12 @@ class BaseWorkerBackend(object):
     def update_progress(self, job_id, progress, total_progress, stage=""):
         msg = ProgressMessage(job_id, progress, total_progress, stage)
         self.msgbackend.send(self.outgoing_message_mailbox, msg)
+
+    def cancel_job_callback(self, job_id, reason=None):
+        """
+        When called,
+        :param job_id:
+        :param reason:
+        :return:
+        """
+        pass

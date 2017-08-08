@@ -38,6 +38,7 @@ class Client(object):
             job = Job(func, *args, **kwargs)
 
         job.track_progress = kwargs.pop('track_progress', False)
+        job.cancellable = kwargs.pop('cancellable', False)
         job_id = self.storage.schedule_job(job)
         return job_id
 
