@@ -10,6 +10,7 @@ from barbequeue.worker.backends import inmem
 class Client(object):
     def __init__(self, app, namespace, **config):
         self.storage = config['storage_backend']
+        self.scheduler = config['scheduler']
 
     def schedule(self, func, *args, **kwargs):
         """
@@ -136,7 +137,8 @@ class SimpleClient(Client):
             incoming_mailbox=self.scheduler_mailbox_name)
 
         super(SimpleClient, self).__init__(
-            app, namespace, storage_backend=self._storage)
+            app, namespace, storage_backend=self._storage,
+            scheduler=self._scheduler)
 
     def shutdown(self):
         """
