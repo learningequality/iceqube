@@ -24,6 +24,9 @@ class State(object):
     FAILED means that the job's function has raised an exception during runtime.
     The job's exception and traceback fields should be set.
 
+    CANCELING means that the system has received the user's request to cancel, and will
+    cancel the job once an opportunity arises.
+
     CANCELED means that the job has been canceled from running.
 
     COMPLETED means that the function has run to completion. The job's result field
@@ -34,6 +37,7 @@ class State(object):
     QUEUED = "QUEUED"
     RUNNING = "RUNNING"
     FAILED = "FAILED"
+    CANCELING = "CANCELING"
     CANCELED = "CANCELED"
     COMPLETED = "COMPLETED"
 

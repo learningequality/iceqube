@@ -50,7 +50,7 @@ class Client(object):
 
         :param job_id: the job_id of the Job to cancel.
         """
-        self.storage.mark_job_as_canceled(job_id)
+        self.scheduler.request_job_cancel(job_id)
 
     def all_jobs(self):
         """

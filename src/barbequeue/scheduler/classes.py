@@ -4,7 +4,7 @@ from threading import Event
 from barbequeue.common.six.moves.queue import Full
 
 from barbequeue.common.utils import InfiniteLoopThread
-from barbequeue.messaging.classes import Message, MessageType
+from barbequeue.messaging.classes import Message, MessageType, CancelMessage
 
 
 class Scheduler(object):
@@ -64,6 +64,18 @@ class Scheduler(object):
         if wait:
             self.scheduler_thread.join()
             self.worker_message_handler_thread.join()
+
+    def request_job_cancel(self, job_id):
+        """
+        Send a message to the workers to cancel the job with job_id. We then mark the job in the storage
+        as being canceled.
+
+        :param job_id: the job to cancel
+        :return: None
+        """
+        msg = CancelMessage(job_id)
+        self.messaging_backend.send(self.worker_mailbox, msg)
+        self.storage_backend.mark_job_as_canceling(job_id)
 
     def schedule_next_job(self):
         """
