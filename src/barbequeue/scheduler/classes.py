@@ -138,5 +138,7 @@ class Scheduler(object):
             exc = actual_msg['exception']
             trace = actual_msg['traceback']
             self.storage_backend.mark_job_as_failed(job_id, exc, trace)
+        elif msg.type == MessageType.JOB_CANCELED:
+            self.storage_backend.mark_job_as_canceled(job_id)
         else:
             self.logger.error("Unknown message type: {}".format(msg.type))

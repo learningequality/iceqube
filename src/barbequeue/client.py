@@ -95,8 +95,8 @@ class Client(object):
         """
         while 1:
             job = self.wait(job_id, timeout=timeout)
-            if job.state in [State.COMPLETED, State.FAILED]:
-                break
+            if job.state in [State.COMPLETED, State.FAILED, State.CANCELED]:
+                return job
             else:
                 continue
 

@@ -124,6 +124,17 @@ class StorageBackend(BaseBackend):
         job, _ = self._update_job_state(job_id, State.CANCELED)
         return job
 
+    def mark_job_as_canceling(self, job_id):
+        """
+        Mark the job as requested for canceling. Does not actually try to cancel a running job.
+
+        :param job_id: the job to be marked as canceling.
+        :return: the job object
+        """
+
+        job, _ = self._update_job_state(job_id, State.CANCELING)
+        return job
+
     def get_next_scheduled_job(self):
         s = self.sessionmaker()
         orm_job = self._ns_query(s).filter_by(

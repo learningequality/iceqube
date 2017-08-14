@@ -92,9 +92,18 @@ class Job(object):
 
         :return: a function that executes the original function assigned to this job.
         """
-        func = import_stringified_func(self.func)
-
         def y(update_progress_func, cancel_job_func):
+            """
+            Call the function stored in self.func, and passing in update_progress_func
+            or cancel_job_func depending if self.track_progress or self.cancellable is defined,
+            respectively.
+            :param update_progress_func: The callback for when the job updates its progress.
+            :param cancel_job_func: The function that the function has to call occasionally to see
+            if the user wants to cancel the currently running job.
+            :return: Any
+            """
+
+            func = import_stringified_func(self.func)
             extrafunckwargs = {}
 
             args, kwargs = copy.copy(self.args), copy.copy(self.kwargs)
@@ -103,7 +112,7 @@ class Job(object):
                 extrafunckwargs["update_progress"] = partial(update_progress_func, self.job_id)
 
             if self.cancellable:
-                extrafunckwargs["cancel"] = partial(cancel_job_func, self.job_id)
+                extrafunckwargs["check_for_cancel"] = partial(cancel_job_func, self.job_id)
 
             kwargs.update(extrafunckwargs)
 
