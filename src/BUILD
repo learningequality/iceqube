@@ -4,5 +4,5 @@ python_library(
   dependencies=[
     "3rdparty/python:SQLAlchemy",
     "3rdparty/python:futures",
-  ]
+  ],
 )
