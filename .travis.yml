@@ -19,13 +19,9 @@ matrix:
       env:
         - TOX_ENV=pypypy
 
-before_install:
-  - pip install -U pip
-  - pip install tox
-
 # command to run tests, e.g. python setup.py test
 script:
-  - tox -e $TOX_ENV
+  - ./pants test :tests
 
 after_success:
   - codecov
