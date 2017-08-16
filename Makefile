@@ -5,7 +5,7 @@ help:
 	@echo "test - run the entire test suite"
 
 dist:
-	./pants setup-py :sdist
+	./pants setup-py src:lib
 
 test:
 	./pants test :tests
