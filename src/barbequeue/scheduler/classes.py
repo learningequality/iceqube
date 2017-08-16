@@ -1,9 +1,10 @@
 import logging
-from six.moves.queue import Empty, Full
 from threading import Event
 
+from barbequeue.common.six.moves.queue import Full
+
 from barbequeue.common.utils import InfiniteLoopThread
-from barbequeue.messaging.classes import Message, MessageType
+from barbequeue.messaging.classes import Message, MessageType, CancelMessage
 
 
 class Scheduler(object):
@@ -18,8 +19,7 @@ class Scheduler(object):
         self.messaging_backend = messaging_backend
 
         self.scheduler_thread = self.start_scheduler()
-        self.worker_message_handler_thread = self.start_worker_message_handler(
-        )
+        self.worker_message_handler_thread = self.start_worker_message_handler()
 
     def start_scheduler(self):
         """
@@ -65,6 +65,18 @@ class Scheduler(object):
             self.scheduler_thread.join()
             self.worker_message_handler_thread.join()
 
+    def request_job_cancel(self, job_id):
+        """
+        Send a message to the workers to cancel the job with job_id. We then mark the job in the storage
+        as being canceled.
+
+        :param job_id: the job to cancel
+        :return: None
+        """
+        msg = CancelMessage(job_id)
+        self.messaging_backend.send(self.worker_mailbox, msg)
+        self.storage_backend.mark_job_as_canceling(job_id)
+
     def schedule_next_job(self):
         """
         Get the next job in the queue to be scheduled, and send a message
@@ -88,7 +100,7 @@ class Scheduler(object):
         except Full:
             logging.debug(
                 "Worker queue full; skipping scheduling of job {} for now.".
-                format(next_job.job_id))
+                    format(next_job.job_id))
             return
 
     def handle_worker_messages(self, timeout):
@@ -102,16 +114,19 @@ class Scheduler(object):
         Returns: None
 
         """
-        try:
-            msg = self.messaging_backend.pop(
-                self.incoming_mailbox, timeout=timeout)
-        except Empty:
-            logging.debug("No new messages from workers.")
-            return
+        msgs = self.messaging_backend.popn(self.incoming_mailbox, n=20)
 
+        for msg in msgs:
+            self.handle_single_message(msg)
+
+    def handle_single_message(self, msg):
+        """
+        Handle one message and modify the job storage appropriately.
+        :param msg: the message to handle
+        :return: None
+        """
         job_id = msg.message['job_id']
         actual_msg = msg.message
-
         if msg.type == MessageType.JOB_UPDATED:
             progress = actual_msg['progress']
             total_progress = actual_msg['total_progress']
@@ -123,5 +138,7 @@ class Scheduler(object):
             exc = actual_msg['exception']
             trace = actual_msg['traceback']
             self.storage_backend.mark_job_as_failed(job_id, exc, trace)
+        elif msg.type == MessageType.JOB_CANCELED:
+            self.storage_backend.mark_job_as_canceled(job_id)
         else:
             self.logger.error("Unknown message type: {}".format(msg.type))

@@ -27,11 +27,10 @@ def msg():
 
 
 class TestBackend:
-    def test_can_send_and_read_to_the_same_mailbox(self, defaultbackend,
-                                                   otherbackend, msg):
-        defaultbackend.send("pytest", msg)
+    def test_can_send_and_read_to_the_same_mailbox(self, defaultbackend, msg):
+        defaultbackend.send("pytesting", msg)
 
-        newmsg = defaultbackend.pop("pytest")
+        newmsg = defaultbackend.pop("pytesting")
 
         assert newmsg.type == msg.type
         assert newmsg.message == msg.message

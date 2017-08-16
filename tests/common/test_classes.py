@@ -1,35 +1,30 @@
+import tempfile
+import time
 import uuid
 from threading import Event
 
 import pytest
-import tempfile
 
-from barbequeue.client import Client, InMemClient
+from barbequeue.client import SimpleClient
 from barbequeue.common.classes import Job, State
 from barbequeue.common.utils import import_stringified_func, stringify_func
 from barbequeue.storage.backends import inmem
-from barbequeue.worker.backends import inmem as worker_inmem
 
 
 @pytest.fixture
 def backend():
-    b = inmem.StorageBackend(app="pytest", namespace="test")
-    yield b
-    b.clear()
-
-
-# ARON: initialize the workers and the scheduler. We might need a shortcut function for that
-@pytest.fixture
-def inmem_worker_backend():
-    w = worker_inmem.WorkerBackend()
-    pass
+    with tempfile.NamedTemporaryFile() as f:
+        b = inmem.StorageBackend(app="pytest", namespace="test", storage_path=f.name)
+        yield b
+        b.clear()
 
 
 @pytest.fixture
 def inmem_client():
-    c = InMemClient('pytest')
-    yield c
-    c.shutdown()
+    with tempfile.NamedTemporaryFile() as f:
+        c = SimpleClient(app="pytest", storage_path=f.name)
+        yield c
+        c.shutdown()
 
 
 @pytest.fixture
@@ -41,6 +36,34 @@ def simplejob():
 def scheduled_job(inmem_client, simplejob):
     job_id = inmem_client.schedule(simplejob)
     return inmem_client.storage.get_job(job_id)
+
+
+def cancelable_job(is_running_event, is_not_canceled_event, check_for_cancel=None):
+    """
+    Test function for checking if a job is cancelable. Meant to be used in a job cancel
+    test case.
+
+    When first run, it calls the .set() function in the is_running_event passed in. This
+    is meant to alert the test case that it started to run.
+
+    It then calls the check_for_cancel, followed by a time.sleep function, 3 times. If it still
+    continues (i.e. it did not recieve any cancel request), it then .set()s the is_not_canceled_event,
+    alerting the test case that it waasn't canceled.
+
+    :param is_running_event: An Event or EventProxy that the function sets when it starts running.
+    :param is_not_canceled_event: An Event or EventProxy that the function sets when it runs to completion.
+    :param check_for_cancel: A function that the BBQ framework passes in when a job is set to be cancellable.
+    Calling this function makes the thread check if a cancellation has been requested, and then exits early if true.
+    :return: None
+    """
+
+    is_running_event.set()  # mark the job as running
+
+    for _ in range(3):
+        time.sleep(0.5)
+        check_for_cancel()
+
+    is_not_canceled_event.set()
 
 
 FLAG = False
@@ -141,13 +164,14 @@ class TestClient(object):
         flag.wait(timeout=5)
         assert flag.is_set()
 
+        # sleep for half a second to make us switch to another thread
+        time.sleep(0.5)
         try:
             inmem_client._storage.wait_for_job_update(job_id, timeout=2)
         except Exception:
             # welp, maybe a job update happened in between that schedule call and the wait call.
             # at least we waited!
             pass
-
         job = inmem_client.status(job_id)
         assert job.state == State.COMPLETED
 
@@ -158,7 +182,7 @@ class TestClient(object):
             inmem_client.schedule(set_flag, e)
 
         for e in events:
-            assert e.wait(timeout=1)
+            assert e.wait(timeout=2)
 
     def test_scheduled_job_can_receive_job_updates(self, inmem_client, flag):
         job_id = inmem_client.schedule(
@@ -185,9 +209,22 @@ class TestClient(object):
         assert inmem_client.status(
             scheduled_job.job_id).job_id == scheduled_job.job_id
 
-    def test_can_cancel_a_job(self, inmem_client, scheduled_job):
-        inmem_client.cancel(scheduled_job.job_id)
+    def test_can_cancel_a_job(self, inmem_client):
+        is_running_event = EventProxy()
+        is_not_canceled_event = EventProxy()
+        job_id = inmem_client.schedule(cancelable_job, is_running_event=is_running_event,
+                                    is_not_canceled_event=is_not_canceled_event, cancellable=True)
 
-        # Is our job marked as canceled?
-        job = inmem_client.status(scheduled_job.job_id)
+        is_running_event.wait(1.0)
+        # Job should be running after this point
+
+        # Now let's cancel...
+        inmem_client.cancel(job_id)
+        # And check the job state to make sure it's marked as cancelling
+        job = inmem_client.status(job_id)
+        assert job.state == State.CANCELING
+
+        # Let's wait for another job state change...
+        job = inmem_client.wait_for_completion(job_id, timeout=2.0)
+        # and hopefully it's canceled by this point
         assert job.state == State.CANCELED

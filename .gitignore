@@ -91,3 +91,7 @@ ENV/
 
 .DS_Store
 /TAGS
+
+# pants files
+/.pants.d/
+.pants.workdir.file_lock

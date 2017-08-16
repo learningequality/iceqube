@@ -1,13 +1,12 @@
+import logging
 import uuid
 from collections import defaultdict, deque
 from copy import copy
-from threading import Event
 
-import logging
+from sqlalchemy import Column, DateTime, Index, Integer, PickleType, String, create_engine, event, func, or_
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, Integer, String, PickleType, Boolean, DateTime, func, create_engine, Index, or_
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import QueuePool, AssertionPool, StaticPool
+from sqlalchemy.pool import QueuePool, StaticPool
 
 from barbequeue.common.classes import State
 from barbequeue.storage.backends.default import BaseBackend
@@ -47,7 +46,7 @@ class ORMJob(Base):
     time_created = Column(DateTime(timezone=True), server_default=func.now())
     time_updated = Column(DateTime(timezone=True), server_onupdate=func.now())
 
-    __table_args__ = (Index('app_namespace_index', 'app', 'namespace'), )
+    __table_args__ = (Index('app_namespace_index', 'app', 'namespace'),)
 
 
 class StorageBackend(BaseBackend):
@@ -57,7 +56,6 @@ class StorageBackend(BaseBackend):
     def __init__(self, app, namespace, storage_path, *args, **kwargs):
         self.app = app
         self.namespace = namespace
-        self.namespace_id = uuid.uuid5(uuid.NAMESPACE_DNS, app + namespace).hex
 
         if storage_path == self.MEMORY:
             storage_path = "sqlite:///:memory:"
@@ -70,11 +68,27 @@ class StorageBackend(BaseBackend):
             storage_path,
             connect_args={'check_same_thread': False},
             poolclass=connection_class)
+        self.set_sqlite_pragmas()
         Base.metadata.create_all(self.engine)
         self.sessionmaker = sessionmaker(bind=self.engine)
 
         # create the tables if they don't exist yet
         super(StorageBackend, self).__init__(*args, **kwargs)
+
+    def set_sqlite_pragmas(self):
+        """
+        Sets the connection PRAGMAs for the sqlalchemy engine stored in self.engine.
+
+        It currently sets:
+        - journal_mode to WAL
+
+        :return: None
+        """
+
+        def _pragmas_on_connect(dbapi_con, con_record):
+            dbapi_con.execute("PRAGMA journal_mode = WAL;")
+
+        event.listen(self.engine, "connect", _pragmas_on_connect)
 
     def schedule_job(self, j):
         """
@@ -101,22 +115,25 @@ class StorageBackend(BaseBackend):
 
         return job_id
 
-    def cancel_job(self, job_id):
+    def mark_job_as_canceled(self, job_id):
         """
 
         Mark the job as canceled. Does not actually try to cancel a running job.
 
         """
-        raise NotImplementedError
-        # job = self._get_job_nocopy(job_id)
-        #
-        # # Mark the job as canceled.
-        # job.state = State.CANCELED
-        #
-        # # Remove it from the queue.
-        # self.queue.remove(job_id)
-        #
-        # return self.get_job(job)
+        job, _ = self._update_job_state(job_id, State.CANCELED)
+        return job
+
+    def mark_job_as_canceling(self, job_id):
+        """
+        Mark the job as requested for canceling. Does not actually try to cancel a running job.
+
+        :param job_id: the job to be marked as canceling.
+        :return: the job object
+        """
+
+        job, _ = self._update_job_state(job_id, State.CANCELING)
+        return job
 
     def get_next_scheduled_job(self):
         s = self.sessionmaker()
@@ -130,7 +147,9 @@ class StorageBackend(BaseBackend):
         return job
 
     def get_scheduled_jobs(self):
-        return [self.get_job(jid) for jid in INMEM_QUEUE[self.namespace_id]]
+        s = self.sessionmaker()
+        jobs = self._ns_query(s).filter_by(state=State.SCHEDULED).order_by(ORMJob.queue_order)
+        return [job.obj for job in jobs]
 
     def get_all_jobs(self):
         s = self.sessionmaker()
@@ -144,24 +163,42 @@ class StorageBackend(BaseBackend):
         s.close()
         return job
 
-    def clear(self, job_id=None):
+    def clear(self, job_id=None, force=False):
         """
         Clear the queue and the job data. If job_id is not given, clear out all
         jobs marked COMPLETED. If job_id is given, clear out the given job's
         data. This function won't do anything if the job's state is not COMPLETED or FAILED.
+        :type job_id: NoneType or str
+        :param job_id: the job_id to clear. If None, clear all jobs.
+        :type force: bool
+        :param force: If True, clear the job (or jobs), even if it hasn't completed or failed.
         """
         s = self.sessionmaker()
         q = self._ns_query(s)
         if job_id:
             q = q.filter_by(id=job_id)
 
-        q = q.filter(
-            or_(ORMJob.state == State.COMPLETED, ORMJob.state == State.FAILED))
+        # filter only by the finished jobs, if we are not specified to force
+        if not force:
+            q = q.filter(
+                or_(ORMJob.state == State.COMPLETED, ORMJob.state == State.FAILED))
+
         q.delete(synchronize_session=False)
         s.commit()
         s.close()
 
     def update_job_progress(self, job_id, progress, total_progress):
+        """
+        Update the job given by job_id's progress info.
+        :type total_progress: int
+        :type progress: int
+        :type job_id: str
+        :param job_id: The id of the job to update
+        :param progress: The current progress achieved by the job
+        :param total_progress: The total progress achievable by the job.
+        :return: the job_id
+        """
+
         session = self.sessionmaker()
         job, orm_job = self._update_job_state(
             job_id, state=State.RUNNING, session=session)
@@ -189,7 +226,7 @@ class StorageBackend(BaseBackend):
     def mark_job_as_queued(self, job_id):
         """
         Change the job given by job_id to QUEUED.
-        
+
         :param job_id: the job to be marked as QUEUED.
         :return: None
         """

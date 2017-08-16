@@ -1,13 +1,16 @@
+import logging
 import traceback
 from abc import ABCMeta, abstractmethod
 
-import logging
-from six.moves import queue
+from barbequeue.common.six.moves import queue
 
 from barbequeue.common.utils import InfiniteLoopThread
-from barbequeue.messaging.classes import MessageType, ProgressMessage, SuccessMessage, FailureMessage
+from barbequeue.messaging.classes import (
+    FailureMessage, MessageType, ProgressMessage, SuccessMessage,
+    JobCanceledMessage, )
 
 logger = logging.getLogger(__name__)
+
 
 class BaseWorkerBackend(object):
     __metaclass__ = ABCMeta
@@ -30,8 +33,16 @@ class BaseWorkerBackend(object):
         pass
 
     @abstractmethod
-    def shutdown(self, wait):
+    def shutdown_workers(self, wait):
         pass
+
+    @abstractmethod
+    def cancel(self, job_id):
+        pass
+
+    def shutdown(self, wait=False):
+        self.message_processor.stop()
+        self.shutdown_workers(wait=wait)
 
     def start_message_processing(self):
         """
@@ -74,7 +85,12 @@ class BaseWorkerBackend(object):
             job = msg.message['job']
             self.schedule_job(job)
         elif msg.type == MessageType.CANCEL_JOB:
-            pass
+            job_id = msg.message['job_id']
+            self.cancel(job_id)
+
+    def report_cancelled(self, job, last_stage):
+        msg = JobCanceledMessage(job.job_id, is_successfully_canceled=True, last_stage=last_stage)
+        self.msgbackend.send(self.outgoing_message_mailbox, msg)
 
     def report_success(self, job, result):
         msg = SuccessMessage(job.job_id, result)

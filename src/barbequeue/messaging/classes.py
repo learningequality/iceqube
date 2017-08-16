@@ -12,6 +12,7 @@ class MessageType(object):
     JOB_STARTED = "JOB_STARTED"
     JOB_UPDATED = "JOB_UPDATED"
     JOB_COMPLETED = "JOB_COMPLETED"
+    JOB_CANCELED = "JOB_CANCELED"
 
     # Job command messages
     START_JOB = "START_JOB"
@@ -38,9 +39,9 @@ class SuccessMessage(Message):
 class FailureMessage(Message):
     def __new__(cls, job_id, exc, trace):
         """
-        Creates a message indicating an exception was raised when running the job given by job_id. 
+        Creates a message indicating an exception was raised when running the job given by job_id.
         The exc is the exception raised, while trace is a string showing the traceback.
-        
+
         :type trace: str
         :type exc: Exception
         :type job_id: str
@@ -59,13 +60,13 @@ class ProgressMessage(Message):
     def __new__(cls, job_id, progress, total_progress, stage=""):
         """
         Creates a Message that updates the progress for the job given by job_id.
-       
+
         :param job_id: The job_id of the job to update.
         :param progress: the current progress achieved by the running function so far. It should be less than or equal to the value of total_progress.
         :param total_progress: the total amount of progress achievable by the function. This can correspond directly to a concrete action done by the function (such as total number of videos to download, the number of items to process etc.)
         :param stage: an optional argument giving a short name for the current stage the job is on, e.g. 'downloading videos', 'loading subtitles', etc.
-        :return: None
-        
+        :return: Message
+
         :type job_id: str
         :type progress: float
         :type total_progress: float
@@ -73,4 +74,40 @@ class ProgressMessage(Message):
         """
         msg = {'job_id': job_id, 'progress': progress, 'total_progress': total_progress, 'stage': stage}
         self = super(ProgressMessage, cls).__new__(cls, type=MessageType.JOB_UPDATED, message=msg)
+        return self
+
+
+class CancelMessage(Message):
+    def __new__(cls, job_id):
+        """
+        Creates a Message that tells the worker(s) to cancel the job with job_id.
+
+        :param job_id: The job_id of the job to cancel.
+        :return: Message
+
+        :type job_id: str
+        """
+
+        msg = {"job_id": job_id}
+        self = super(CancelMessage, cls).__new__(cls, type=MessageType.CANCEL_JOB, message=msg)
+        return self
+
+
+class JobCanceledMessage(Message):
+    def __new__(cls, job_id, is_successfully_canceled, last_stage):
+        """
+        Creates a Message that informs the user that the job has been canceled.
+
+        :param job_id: the job_id
+        :param is_successfully_canceled: Whether the job has been canceled voluntarily, or whether it was force-killed.
+        :param last_stage: The canceled job can annotate what stage it was at before canceling.
+        :return: Message
+
+        :type job_id: str
+        :type is_successfully_canceled: bool
+        :type last_stage: str
+        """
+
+        msg = {"job_id": job_id, "is_successfully_canceled": is_successfully_canceled, "last_stage": last_stage}
+        self = super(JobCanceledMessage, cls).__new__(cls, type=MessageType.JOB_CANCELED, message=msg)
         return self

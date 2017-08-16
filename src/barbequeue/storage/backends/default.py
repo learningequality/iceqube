@@ -15,7 +15,7 @@ class BaseBackend(object):
         pass
 
     @abc.abstractmethod
-    def cancel_job(self, job_id):
+    def mark_job_as_canceled(self, job_id):
         pass
 
     @abc.abstractmethod

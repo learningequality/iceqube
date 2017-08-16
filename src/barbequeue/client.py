@@ -10,6 +10,7 @@ from barbequeue.worker.backends import inmem
 class Client(object):
     def __init__(self, app, namespace, **config):
         self.storage = config['storage_backend']
+        self.scheduler = config['scheduler']
 
     def schedule(self, func, *args, **kwargs):
         """
@@ -38,6 +39,7 @@ class Client(object):
             job = Job(func, *args, **kwargs)
 
         job.track_progress = kwargs.pop('track_progress', False)
+        job.cancellable = kwargs.pop('cancellable', False)
         job_id = self.storage.schedule_job(job)
         return job_id
 
@@ -48,7 +50,7 @@ class Client(object):
 
         :param job_id: the job_id of the Job to cancel.
         """
-        self.storage.cancel_job(job_id)
+        self.scheduler.request_job_cancel(job_id)
 
     def all_jobs(self):
         """
@@ -77,7 +79,7 @@ class Client(object):
         """
         Wait until the job given by job_id has a new update.
 
-        :param job_id: the id of the job to wait for. 
+        :param job_id: the id of the job to wait for.
         :param timeout: how long to wait for a job state change before timing out.
         :return: Job object corresponding to job_id
         """
@@ -88,22 +90,23 @@ class Client(object):
         Wait for the job given by job_id to change to COMPLETED or CANCELED. Raises a
         barbequeue.exceptions.TimeoutError if timeout is exceeded before each job change.
 
-        :param job_id: the id of the job to wait for. 
+        :param job_id: the id of the job to wait for.
         :param timeout: how long to wait for a job state change before timing out.
         """
         while 1:
             job = self.wait(job_id, timeout=timeout)
-            if job.state in [State.COMPLETED, State.FAILED]:
-                break
+            if job.state in [State.COMPLETED, State.FAILED, State.CANCELED]:
+                return job
             else:
                 continue
-            return job
 
-    def clear(self):
+    def clear(self, force=False):
         """
         Clear all jobs that have succeeded or failed.
+        :type force: bool
+        :param force: Whether to clear all jobs from the job storage queue, regardless if they've been completed or not.
         """
-        self.storage.clear()
+        self.storage.clear(force=force)
 
 
 class SimpleClient(Client):
@@ -115,7 +118,6 @@ class SimpleClient(Client):
     MEMORY = storage_inmem.StorageBackend.MEMORY
 
     def __init__(self, app, worker_type=THREAD_BASED, storage_path=MEMORY):
-
         # simplify configuration by making app and namespace the same thing
         namespace = app
 
@@ -135,7 +137,8 @@ class SimpleClient(Client):
             incoming_mailbox=self.scheduler_mailbox_name)
 
         super(SimpleClient, self).__init__(
-            app, namespace, storage_backend=self._storage)
+            app, namespace, storage_backend=self._storage,
+            scheduler=self._scheduler)
 
     def shutdown(self):
         """
@@ -147,8 +150,8 @@ class SimpleClient(Client):
         :return: None
         """
         self._storage.clear()
-        self._scheduler.shutdown()
-        self._workers.shutdown()
+        self._scheduler.shutdown(wait=False)
+        self._workers.shutdown(wait=False)
 
 
 class InMemClient(SimpleClient):
@@ -156,7 +159,7 @@ class InMemClient(SimpleClient):
     A client that starts and runs all jobs in memory. In particular, the following barbequeue components are all
     running
     their in-memory counterparts:
-    
+
     - Scheduler
     - Job storage
     - Workers
