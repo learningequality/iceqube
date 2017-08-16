@@ -4,6 +4,11 @@ language: python
 
 sudo: false
 
+cache:
+  directories:
+    - .pants.d
+    - $HOME/.cache/pants
+
 matrix:
   include:
     - python: "2.7"
