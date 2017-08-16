@@ -182,7 +182,7 @@ class TestClient(object):
             inmem_client.schedule(set_flag, e)
 
         for e in events:
-            assert e.wait(timeout=1)
+            assert e.wait(timeout=2)
 
     def test_scheduled_job_can_receive_job_updates(self, inmem_client, flag):
         job_id = inmem_client.schedule(
