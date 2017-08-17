@@ -2,16 +2,8 @@ import traceback
 
 from concurrent.futures import CancelledError
 
+from barbequeue.exceptions import UserCancelledError
 from barbequeue.worker.backends.base import BaseWorkerBackend
-
-
-class UserCancelledError(CancelledError):
-    """
-    An error raised when the user cancels the current job.
-    """
-
-    def __init__(self, last_stage):
-        self.last_stage = last_stage
 
 
 class WorkerBackend(BaseWorkerBackend):
