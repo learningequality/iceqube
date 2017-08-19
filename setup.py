@@ -11,7 +11,7 @@ from setuptools import find_packages, setup
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
 # noqa
-from barbequeue import __version__  # isort:skip  # noqa
+from iceqube import __version__  # isort:skip  # noqa
 
 IS_PYTHON_2 = sys.version_info < (3, )
 
@@ -27,7 +27,7 @@ def read_file(fname):
     return open(fname).read()
 
 
-dist_name = 'barbequeue'
+dist_name = 'iceqube'
 
 readme = read_file('README.rst')
 
@@ -62,8 +62,8 @@ setup(
     description=description,
     long_description="{readme}".format(readme=readme),
     author='Learning Equality',
-    author_email='aron+barbequeue@learningequality.org',
-    url='https://github.com/learningequality/barbequeue',
+    author_email='aron+iceqube@learningequality.org',
+    url='https://github.com/learningequality/iceqube',
     packages=find_packages('src'),
     package_dir={'': 'src'},
     include_package_data=True,

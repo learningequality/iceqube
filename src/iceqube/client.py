@@ -1,10 +1,10 @@
 import uuid
 
-from barbequeue.common.classes import Job, State
-from barbequeue.messaging.backends import inmem as messaging_inmem
-from barbequeue.scheduler.classes import Scheduler
-from barbequeue.storage.backends import inmem as storage_inmem
-from barbequeue.worker.backends import inmem
+from iceqube.common.classes import Job, State
+from iceqube.messaging.backends import inmem as messaging_inmem
+from iceqube.scheduler.classes import Scheduler
+from iceqube.storage.backends import inmem as storage_inmem
+from iceqube.worker.backends import inmem
 
 
 class Client(object):
@@ -88,7 +88,7 @@ class Client(object):
     def wait_for_completion(self, job_id, timeout=None):
         """
         Wait for the job given by job_id to change to COMPLETED or CANCELED. Raises a
-        barbequeue.exceptions.TimeoutError if timeout is exceeded before each job change.
+        iceqube.exceptions.TimeoutError if timeout is exceeded before each job change.
 
         :param job_id: the id of the job to wait for.
         :param timeout: how long to wait for a job state change before timing out.
@@ -156,7 +156,7 @@ class SimpleClient(Client):
 
 class InMemClient(SimpleClient):
     """
-    A client that starts and runs all jobs in memory. In particular, the following barbequeue components are all
+    A client that starts and runs all jobs in memory. In particular, the following iceqube components are all
     running
     their in-memory counterparts:
 

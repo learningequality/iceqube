@@ -3,13 +3,13 @@ from concurrent.futures import CancelledError
 
 class BaseError(Exception):
     """
-    The base exception for all errors raised by barbequeue
+    The base exception for all errors raised by iceqube
     """
     pass
 
 class TimeoutError(BaseError):
     """
-    An error raised by barbequeue.storage.wait() when no job updates come in.
+    An error raised by iceqube.storage.wait() when no job updates come in.
     """
 
 

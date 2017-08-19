@@ -1,7 +1,7 @@
 import time
 import threading
 
-from barbequeue.common.utils import InfiniteLoopThread
+from iceqube.common.utils import InfiniteLoopThread
 
 
 class TestBaseCloseableThread(object):

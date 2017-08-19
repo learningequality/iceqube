@@ -8,8 +8,8 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import QueuePool, StaticPool
 
-from barbequeue.common.classes import State
-from barbequeue.storage.backends.default import BaseBackend
+from iceqube.common.classes import State
+from iceqube.storage.backends.default import BaseBackend
 
 INMEM_STORAGE = {}
 INMEM_QUEUE = defaultdict(lambda: deque())

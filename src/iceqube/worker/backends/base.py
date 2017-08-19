@@ -2,10 +2,10 @@ import logging
 import traceback
 from abc import ABCMeta, abstractmethod
 
-from barbequeue.common.six.moves import queue
+from iceqube.common.six.moves import queue
 
-from barbequeue.common.utils import InfiniteLoopThread
-from barbequeue.messaging.classes import (
+from iceqube.common.utils import InfiniteLoopThread
+from iceqube.messaging.classes import (
     FailureMessage, MessageType, ProgressMessage, SuccessMessage,
     JobCanceledMessage, )
 

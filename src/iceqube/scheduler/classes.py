@@ -1,10 +1,10 @@
 import logging
 from threading import Event
 
-from barbequeue.common.six.moves.queue import Full
+from iceqube.common.six.moves.queue import Full
 
-from barbequeue.common.utils import InfiniteLoopThread
-from barbequeue.messaging.classes import Message, MessageType, CancelMessage
+from iceqube.common.utils import InfiniteLoopThread
+from iceqube.messaging.classes import Message, MessageType, CancelMessage
 
 
 class Scheduler(object):

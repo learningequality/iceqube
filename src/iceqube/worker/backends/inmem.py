@@ -3,8 +3,8 @@ import traceback
 from concurrent.futures import CancelledError
 from concurrent.futures._base import CANCELLED_AND_NOTIFIED, CANCELLED
 
-from barbequeue.exceptions import UserCancelledError
-from barbequeue.worker.backends.base import BaseWorkerBackend
+from iceqube.exceptions import UserCancelledError
+from iceqube.worker.backends.base import BaseWorkerBackend
 
 
 class WorkerBackend(BaseWorkerBackend):

@@ -2,7 +2,7 @@ import abc
 from collections import defaultdict
 from threading import Event
 
-from barbequeue.exceptions import TimeoutError
+from iceqube.exceptions import TimeoutError
 
 JOB_EVENT_MAPPING = defaultdict(lambda: Event())
 
@@ -45,11 +45,11 @@ class BaseBackend(object):
     def wait_for_job_update(self, job_id, timeout=None):
         """
         Blocks until a job given by job_id has updated its state (canceled, completed, progress updated, etc.)
-        if timeout is not None, then this function raises barbequeue.exceptions.TimeoutError.
-        
+        if timeout is not None, then this function raises iceqube.exceptions.TimeoutError.
+
         :param job_id: the job's job_id to monitor for changes.
         :param timeout: if None, wait forever for a job update. If given, wait until timeout seconds, and then raise
-        barbequeue.exceptions.TimeoutError.
+        iceqube.exceptions.TimeoutError.
         :return: the Job object corresponding to job_id.
         """
         # internally, we register an Event object for each entry in this function.
@@ -70,7 +70,7 @@ class BaseBackend(object):
     def notify_of_job_update(job_id):
         """
         Unblocks any thread waiting for job updates for the job given by job_id.
-        
+
         :param job_id: any threads waiting for the job given by job_id is released from waiting.
         :return: None
         """

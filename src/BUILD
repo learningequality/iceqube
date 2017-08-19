@@ -1,12 +1,12 @@
 python_library(
   name="lib",
-  sources=rglobs("barbequeue/**/*.py"),
+  sources=rglobs("iceqube/**/*.py"),
   dependencies=[
     "3rdparty/python:SQLAlchemy",
     "3rdparty/python:futures",
   ],
     provides=setup_py(
-    name="barbequeue",
+    name="iceqube",
     version="0.0.1",
     description="",
     long_description="",
