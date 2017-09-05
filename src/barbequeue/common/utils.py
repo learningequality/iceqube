@@ -44,6 +44,8 @@ class BaseCloseableThread(threading.Thread):
     DEFAULT_TIMEOUT_SECONDS = 0.2
 
     def __init__(self, shutdown_event, thread_name, *args, **kwargs):
+        # Because of https://github.com/learningequality/kolibri/issues/1786
+        assert shutdown_event, "Need a proper reference for a shutdown event"
         self.shutdown_event = shutdown_event
         self.thread_name = thread_name
         self.thread_id = self._generate_thread_id()
