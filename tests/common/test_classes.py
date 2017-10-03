@@ -5,10 +5,10 @@ from threading import Event
 
 import pytest
 
-from barbequeue.client import SimpleClient
-from barbequeue.common.classes import Job, State
-from barbequeue.common.utils import import_stringified_func, stringify_func
-from barbequeue.storage.backends import inmem
+from iceqube.client import SimpleClient
+from iceqube.common.classes import Job, State
+from iceqube.common.utils import import_stringified_func, stringify_func
+from iceqube.storage.backends import inmem
 
 
 @pytest.fixture

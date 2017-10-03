@@ -1,9 +1,10 @@
 import traceback
 
 from concurrent.futures import CancelledError
+from concurrent.futures._base import CANCELLED_AND_NOTIFIED, CANCELLED
 
-from barbequeue.exceptions import UserCancelledError
-from barbequeue.worker.backends.base import BaseWorkerBackend
+from iceqube.exceptions import UserCancelledError
+from iceqube.worker.backends.base import BaseWorkerBackend
 
 
 class WorkerBackend(BaseWorkerBackend):
@@ -122,7 +123,7 @@ class WorkerBackend(BaseWorkerBackend):
         """
 
         future = self.future_job_mapping[job_id]
-        is_cancelled = future._state
+        is_cancelled = future._state in [CANCELLED, CANCELLED_AND_NOTIFIED]
 
         if is_cancelled:
             raise UserCancelledError(last_stage=current_stage)

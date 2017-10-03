@@ -4,9 +4,9 @@ import logging
 import threading
 import time
 
-from barbequeue.common.six.moves import _thread as thread
+from iceqube.common.six.moves import _thread as thread
 
-from barbequeue import humanhash
+from iceqube import humanhash
 
 
 def stringify_func(func):

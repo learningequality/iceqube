@@ -1,18 +1,18 @@
 python_library(
   name="lib",
-  sources=rglobs("barbequeue/**/*.py"),
+  sources=rglobs("iceqube/**/*.py"),
   dependencies=[
     "3rdparty/python:SQLAlchemy",
     "3rdparty/python:futures",
   ],
     provides=setup_py(
-    name="barbequeue",
+    name="iceqube",
     version="0.0.1",
     description="",
     long_description="",
     author='Learning Equality',
-    author_email='aron+barbequeue@learningequality.org',
-    url='https://github.com/learningequality/barbequeue',
+    author_email='aron@learningequality.org',
+    url='https://github.com/learningequality/iceqube',
     license='MIT',
     zip_safe=True,
     keywords=('queue', 'async'),
