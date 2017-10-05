@@ -5,7 +5,7 @@ from copy import copy
 
 from sqlalchemy import Column, DateTime, Index, Integer, PickleType, String, create_engine, event, func, or_
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.pool import QueuePool, StaticPool
 
 from iceqube.common.classes import State
@@ -70,7 +70,7 @@ class StorageBackend(BaseBackend):
             poolclass=connection_class)
         self.set_sqlite_pragmas()
         Base.metadata.create_all(self.engine)
-        self.sessionmaker = sessionmaker(bind=self.engine)
+        self.sessionmaker = scoped_session(sessionmaker(bind=self.engine))
 
         # create the tables if they don't exist yet
         super(StorageBackend, self).__init__(*args, **kwargs)
