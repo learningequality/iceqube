@@ -59,7 +59,7 @@ class MessagingBackend(BaseMessagingBackend):
         pass
 
     def send(self, mailbox, message, *args, **kwargs):
-        INMEM_SUPER_MAILBOX[mailbox].put(message)
+        INMEM_SUPER_MAILBOX[mailbox]._put(message)
         logger.debug("SEND MAILBOX: {} MSG: {}".format(mailbox, message))
 
     def wait(self, mailbox, timeout=None):
