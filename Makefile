@@ -5,6 +5,7 @@ help:
 	@echo "test - run the entire test suite"
 
 dist:
+	rm -r dist/*
 	./pants setup-py src:lib
 	./pants setup-py --setup-py-run="bdist_wheel --universal -d $(PWD)/dist" src:lib
 	# Copy over the generated setup.py to the root dir, to allow github installation
