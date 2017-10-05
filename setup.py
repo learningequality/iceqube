@@ -34,6 +34,6 @@ setup(**
                     'iceqube.worker',
                     'iceqube.worker.backends'],
     'url': 'https://github.com/learningequality/iceqube',
-    'version': '0.0.1',
+    'version': '0.0.2',
     'zip_safe': True}
 )
