@@ -11,5 +11,8 @@ dist:
 	# Copy over the generated setup.py to the root dir, to allow github installation
 	cp dist/iceqube-*/setup.py ./setup.py
 
+release: dist
+	twine upload dist/iceqube-.{whl,tar.gz}
+
 test:
 	./pants test :tests
