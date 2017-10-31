@@ -12,7 +12,7 @@ dist:
 	cp dist/iceqube-*/setup.py ./setup.py
 
 release: dist
-	twine upload dist/iceqube-.{whl,tar.gz}
+	twine upload dist/iceqube-*.{whl,tar.gz}
 
 test:
 	./pants test :tests
