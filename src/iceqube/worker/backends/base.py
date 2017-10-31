@@ -98,6 +98,7 @@ class BaseWorkerBackend(object):
 
     def report_error(self, job, exc, trace):
         trace = traceback.format_exc()
+        logger.warning("Job {} raised an exception: {}".format(job.job_id, trace))
         msg = FailureMessage(job.job_id, exc, trace)
         self.msgbackend.send(self.outgoing_message_mailbox, msg)
 
