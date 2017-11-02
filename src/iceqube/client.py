@@ -16,13 +16,20 @@ class Client(object):
         """
         Schedules a function func for execution.
 
-        The only other special parameter is track_progress. If passed in and not None, the func will be passed in a
+        One special parameter is track_progress. If passed in and not None, the func will be passed in a
         keyword parameter called update_progress:
 
         def update_progress(progress, total_progress, stage=""):
 
         The running function can call the update_progress function to notify interested parties of the function's
         current progress.
+
+        Another special parameter is the "cancellable" keyword parameter. When passed in and not None, a special
+        "check_for_cancel" parameter is passed in. When called, it raises an error when the user has requested a job
+        to be cancelled.
+
+        The caller can also pass in any pickleable object into the "extra_metadata" parameter. This data is stored
+        within the job and can be retrieved when the job status is queried.
 
         All other parameters are directly passed to the function when it starts running.
 
@@ -40,6 +47,7 @@ class Client(object):
 
         job.track_progress = kwargs.pop('track_progress', False)
         job.cancellable = kwargs.pop('cancellable', False)
+        job.extra_metadata = kwargs.pop('extra_metadata', {})
         job_id = self.storage.schedule_job(job)
         return job_id
 

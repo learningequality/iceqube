@@ -158,6 +158,13 @@ class TestClient(object):
         # is the job recorded in the chosen backend?
         assert inmem_client.status(job_id).job_id == job_id
 
+    def test_schedule_preserves_extra_metadata(self, inmem_client):
+        metadata = {"saved": True}
+        job_id = inmem_client.schedule(id, 1, extra_metadata=metadata)
+
+        # Do we get back the metadata we save?
+        assert inmem_client.status(job_id).extra_metadata == metadata
+
     def test_schedule_runs_function(self, inmem_client, flag):
         job_id = inmem_client.schedule(set_flag, flag)
 
