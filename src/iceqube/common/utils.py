@@ -1,12 +1,12 @@
 import abc
 import importlib
 import logging
-import threading
 import time
 
 from iceqube.common.six.moves import _thread as thread
 
 from iceqube import humanhash
+from iceqube import threading
 
 
 def stringify_func(func):

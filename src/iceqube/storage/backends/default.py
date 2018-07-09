@@ -1,8 +1,8 @@
 import abc
 from collections import defaultdict
-from threading import Event
 
 from iceqube.exceptions import TimeoutError
+from iceqube.threading import Event
 
 JOB_EVENT_MAPPING = defaultdict(lambda: Event())
 

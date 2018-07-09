@@ -1,7 +1,6 @@
 import tempfile
 import time
 import uuid
-from threading import Event
 
 import pytest
 
@@ -9,6 +8,7 @@ from iceqube.client import SimpleClient
 from iceqube.common.classes import Job, State
 from iceqube.common.utils import import_stringified_func, stringify_func
 from iceqube.storage.backends import inmem
+from iceqube.threading import Event
 
 
 @pytest.fixture

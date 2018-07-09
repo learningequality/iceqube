@@ -1,7 +1,7 @@
 import time
-import threading
 
 from iceqube.common.utils import InfiniteLoopThread
+from iceqube import threading
 
 
 class TestBaseCloseableThread(object):
