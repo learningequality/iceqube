@@ -3,6 +3,6 @@ try:
     from multiprocessing import synchronization  # noqa
     # Proxy Process to Thread to allow seamless substitution
     from multiprocessing import Process as Thread
-    from multiprocessing import *
+    from multiprocessing import Event
 except ImportError:
-    from threading import *
+    from threading import Thread, Event
