@@ -1,10 +1,9 @@
-from threading import Event
-
 import pytest
 
 from iceqube.common.classes import Job
 from iceqube.messaging.backends.inmem import MessagingBackend
 from iceqube.messaging.classes import MessageType
+from iceqube.async import Event
 from iceqube.worker.backends import inmem
 
 

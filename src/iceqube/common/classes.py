@@ -65,6 +65,7 @@ class Job(object):
         self.exception = None
         self.track_progress = kwargs.pop('track_progress', False)
         self.cancellable = kwargs.pop('cancellable', False)
+        self.extra_metadata = kwargs.pop('extra_metadata', {})
         self.progress = 0
         self.total_progress = 0
         self.args = args

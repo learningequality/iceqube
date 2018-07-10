@@ -1,12 +1,12 @@
 import abc
 import importlib
 import logging
-import threading
 import time
 
 from iceqube.common.six.moves import _thread as thread
 
 from iceqube import humanhash
+from iceqube import async
 
 
 def stringify_func(func):
@@ -34,7 +34,7 @@ def import_stringified_func(funcstring):
     return func
 
 
-class BaseCloseableThread(threading.Thread):
+class BaseCloseableThread(async.Thread):
     """
     A base class for a thread that monitors an Event as a signal for shutting down, and a main_loop that otherwise loop
      until the shutdown event is received.
@@ -98,7 +98,7 @@ class InfiniteLoopThread(BaseCloseableThread):
         :param thread_name: the name of the thread to use during logging and debugging
         :param wait_between_runs: how many seconds to wait in between func calls.
         """
-        self.shutdown_event = threading.Event()
+        self.shutdown_event = async.Event()
         super(InfiniteLoopThread, self).__init__(thread_name=thread_name, shutdown_event=self.shutdown_event)
         self.func = func
         self.wait = wait_between_runs
@@ -120,13 +120,13 @@ class InfiniteLoopThread(BaseCloseableThread):
 
 class EventWaitingThread(BaseCloseableThread):
     """
-    A thread class that waits for a threading.Event class passed to it to be set, and then runs the function passed
+    A thread class that waits for a async.Event class passed to it to be set, and then runs the function passed
     to it.
     """
 
     def __init__(self, func, thread_name, trigger_event=None):
 
-        self.shutdown_event = threading.Event()
+        self.shutdown_event = async.Event()
         super(EventWaitingThread, self).__init__(thread_name=thread_name, shutdown_event=self.shutdown_event)
 
         self.func = func
