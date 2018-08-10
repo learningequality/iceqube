@@ -1,6 +1,17 @@
 Iceqube
 ==========
 
+.. image:: https://badge.fury.io/py/iceqube.svg
+   :target: https://pypi.python.org/pypi/iceqube/
+.. image:: https://travis-ci.org/learningequality/iceqube.svg
+  :target: https://travis-ci.org/learningequality/iceqube
+.. image:: http://codecov.io/github/learningequality/iceqube/coverage.svg?branch=master
+  :target: http://codecov.io/github/learningequality/iceqube?branch=master
+.. image:: https://readthedocs.org/projects/iceqube/badge/?version=latest
+  :target: http://iceqube.readthedocs.org/en/latest/
+.. image:: https://img.shields.io/badge/irc-%23kolibri%20on%20freenode-blue.svg
+  :target: http://webchat.freenode.net?channels=%23kolibri
+
 A self-contained pure python messaging and task queue system, with
 optional non-Python dependencies
 

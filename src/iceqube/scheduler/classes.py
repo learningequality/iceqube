@@ -1,10 +1,10 @@
 import logging
-from threading import Event
 
 from iceqube.common.six.moves.queue import Full
 
 from iceqube.common.utils import InfiniteLoopThread
 from iceqube.messaging.classes import Message, MessageType, CancelMessage
+from iceqube.async import Event
 
 
 class Scheduler(object):

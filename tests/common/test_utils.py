@@ -1,5 +1,5 @@
-import time
 import threading
+import time
 
 from iceqube.common.utils import InfiniteLoopThread
 
@@ -20,6 +20,8 @@ class TestBaseCloseableThread(object):
         The test here is to see if InfiniteLoopThread (and by extension BaseCloseableThread)
         can handle threading._time being None. We import InfiniteLoopThread
         because it's easier to test.
+
+        Make sure to use the actual threading module.
         """
 
         ev = threading.Event()
