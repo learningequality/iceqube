@@ -1,10 +1,10 @@
 import uuid
 
-from barbequeue.common.classes import Job, State
-from barbequeue.messaging.backends import inmem as messaging_inmem
-from barbequeue.scheduler.classes import Scheduler
-from barbequeue.storage.backends import inmem as storage_inmem
-from barbequeue.worker.backends import inmem
+from iceqube.common.classes import Job, State
+from iceqube.messaging.backends import inmem as messaging_inmem
+from iceqube.scheduler.classes import Scheduler
+from iceqube.storage.backends import inmem as storage_inmem
+from iceqube.worker.backends import inmem
 
 
 class Client(object):
@@ -16,13 +16,20 @@ class Client(object):
         """
         Schedules a function func for execution.
 
-        The only other special parameter is track_progress. If passed in and not None, the func will be passed in a
+        One special parameter is track_progress. If passed in and not None, the func will be passed in a
         keyword parameter called update_progress:
 
         def update_progress(progress, total_progress, stage=""):
 
         The running function can call the update_progress function to notify interested parties of the function's
         current progress.
+
+        Another special parameter is the "cancellable" keyword parameter. When passed in and not None, a special
+        "check_for_cancel" parameter is passed in. When called, it raises an error when the user has requested a job
+        to be cancelled.
+
+        The caller can also pass in any pickleable object into the "extra_metadata" parameter. This data is stored
+        within the job and can be retrieved when the job status is queried.
 
         All other parameters are directly passed to the function when it starts running.
 
@@ -40,6 +47,7 @@ class Client(object):
 
         job.track_progress = kwargs.pop('track_progress', False)
         job.cancellable = kwargs.pop('cancellable', False)
+        job.extra_metadata = kwargs.pop('extra_metadata', {})
         job_id = self.storage.schedule_job(job)
         return job_id
 
@@ -88,7 +96,7 @@ class Client(object):
     def wait_for_completion(self, job_id, timeout=None):
         """
         Wait for the job given by job_id to change to COMPLETED or CANCELED. Raises a
-        barbequeue.exceptions.TimeoutError if timeout is exceeded before each job change.
+        iceqube.exceptions.TimeoutError if timeout is exceeded before each job change.
 
         :param job_id: the id of the job to wait for.
         :param timeout: how long to wait for a job state change before timing out.
@@ -156,7 +164,7 @@ class SimpleClient(Client):
 
 class InMemClient(SimpleClient):
     """
-    A client that starts and runs all jobs in memory. In particular, the following barbequeue components are all
+    A client that starts and runs all jobs in memory. In particular, the following iceqube components are all
     running
     their in-memory counterparts:
 
@@ -172,3 +180,5 @@ class InMemClient(SimpleClient):
             storage_path=self.MEMORY,
             *args,
             **kwargs)
+
+

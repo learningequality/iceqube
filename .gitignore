@@ -95,3 +95,10 @@ ENV/
 # pants files
 /.pants.d/
 .pants.workdir.file_lock
+
+# IntelliJ iles
+.idea/
+*.iml
+
+# bazel files
+bazel-*

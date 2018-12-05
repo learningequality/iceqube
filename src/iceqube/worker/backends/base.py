@@ -2,10 +2,10 @@ import logging
 import traceback
 from abc import ABCMeta, abstractmethod
 
-from barbequeue.common.six.moves import queue
+from iceqube.common.six.moves import queue
 
-from barbequeue.common.utils import InfiniteLoopThread
-from barbequeue.messaging.classes import (
+from iceqube.common.utils import InfiniteLoopThread
+from iceqube.messaging.classes import (
     FailureMessage, MessageType, ProgressMessage, SuccessMessage,
     JobCanceledMessage, )
 
@@ -98,6 +98,7 @@ class BaseWorkerBackend(object):
 
     def report_error(self, job, exc, trace):
         trace = traceback.format_exc()
+        logger.warning("Job {} raised an exception: {}".format(job.job_id, trace))
         msg = FailureMessage(job.job_id, exc, trace)
         self.msgbackend.send(self.outgoing_message_mailbox, msg)
 

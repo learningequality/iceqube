@@ -1,8 +1,8 @@
 import pytest
 
-from barbequeue.common.classes import Job, State
-from barbequeue.common.utils import stringify_func
-from barbequeue.storage.backends import inmem
+from iceqube.common.classes import Job, State
+from iceqube.common.utils import stringify_func
+from iceqube.storage.backends import inmem
 
 
 @pytest.fixture

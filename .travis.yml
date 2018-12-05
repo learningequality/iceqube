@@ -4,24 +4,20 @@ language: python
 
 sudo: false
 
-matrix:
-  include:
-    - python: "2.7"
-      env:
-        - TOX_ENV=py27
-    - python: "3.4"
-      env:
-        - TOX_ENV=py34
-    - python: "3.5"
-      env:
-        - TOX_ENV=py35
-    - python: "3.6"
-      env:
-        - TOX_ENV=py36
+cache:
+  directories:
+    - .pants.d
+    - $HOME/.cache/pants
+
+python:
+  - "2.7"
+  - "3.4"
+  - "3.5"
+  - "3.6"
 
 # command to run tests, e.g. python setup.py test
 script:
-  - ./pants test :tests
+  - make test
 
 after_success:
   - codecov
