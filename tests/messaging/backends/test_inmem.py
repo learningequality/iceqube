@@ -1,8 +1,8 @@
 import random
 
 import pytest
-from barbequeue.messaging.backends import inmem
-from barbequeue.messaging.classes import Message, MessageType
+from iceqube.messaging.backends import inmem
+from iceqube.messaging.classes import Message, MessageType
 
 
 @pytest.fixture

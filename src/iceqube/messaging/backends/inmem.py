@@ -2,7 +2,7 @@ import logging
 import time
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
-from barbequeue.common.six.moves.queue import Empty, Queue
+from iceqube.common.six.moves.queue import Empty, Queue
 
 logger = logging.getLogger(__name__)
 
@@ -21,10 +21,10 @@ class BaseMessagingBackend(object):
 
     @abstractmethod
     def wait(self, mailbox, timeout):
-        """Wait until there's at least one item in the mailbox. 
+        """Wait until there's at least one item in the mailbox.
         Raises Queue.Empty if the mailbox is still empty after the given timeout.
-        
-        Note: calling wait() and then pop() is not an atomic operation, 
+
+        Note: calling wait() and then pop() is not an atomic operation,
         pop() may still fail if another object has popped in the meantime."""
         pass
 
@@ -59,7 +59,7 @@ class MessagingBackend(BaseMessagingBackend):
         pass
 
     def send(self, mailbox, message, *args, **kwargs):
-        INMEM_SUPER_MAILBOX[mailbox].put(message)
+        INMEM_SUPER_MAILBOX[mailbox]._put(message)
         logger.debug("SEND MAILBOX: {} MSG: {}".format(mailbox, message))
 
     def wait(self, mailbox, timeout=None):

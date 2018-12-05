@@ -2,7 +2,7 @@ import copy
 import logging
 from functools import partial
 
-from barbequeue.common.utils import import_stringified_func, stringify_func
+from iceqube.common.utils import import_stringified_func, stringify_func
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +65,7 @@ class Job(object):
         self.exception = None
         self.track_progress = kwargs.pop('track_progress', False)
         self.cancellable = kwargs.pop('cancellable', False)
+        self.extra_metadata = kwargs.pop('extra_metadata', {})
         self.progress = 0
         self.total_progress = 0
         self.args = args

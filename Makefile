@@ -1,33 +1,18 @@
 .PHONY: help clean clean-pyc release dist
 
 help:
-	@echo "clean-build - remove build artifacts"
-	@echo "clean-pyc - remove Python file artifacts"
-	@echo "release - package and upload a release"
 	@echo "dist - package"
+	@echo "test - run the entire test suite"
 
-clean: clean-build clean-pyc
+dist:
+	rm -r dist/*
+	./pants setup-py src:lib
+	./pants setup-py --setup-py-run="bdist_wheel --universal -d $(PWD)/dist" src:lib
+	# Copy over the generated setup.py to the root dir, to allow github installation
+	cp dist/iceqube-*/setup.py ./setup.py
 
-clean-build:
-	rm -fr build/
-	rm -fr dist/
-	rm -fr dist-packages-cache/
-	rm -fr dist-packages-temp/
-	rm -fr *.egg-info
-	rm -fr .eggs
-	rm -fr .cache
+release: dist
+	twine upload dist/iceqube-*.{whl,tar.gz}
 
-clean-pyc:
-	find . -name '*.pyc' -exec rm -f {} +
-	find . -name '*.pyo' -exec rm -f {} +
-	find . -name '*~' -exec rm -f {} +
-
-dist: clean
-	python setup.py sdist
-	python setup.py bdist_wheel --universal
-
-pubsubemulator:
-	gcloud beta emulators pubsub start
-
-simpletest:
-	pip install --upgrade . && pytest
+test:
+	./pants test :tests

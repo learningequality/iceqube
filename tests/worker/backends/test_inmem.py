@@ -1,11 +1,10 @@
-from threading import Event
-
 import pytest
 
-from barbequeue.common.classes import Job
-from barbequeue.messaging.backends.inmem import MessagingBackend
-from barbequeue.messaging.classes import MessageType
-from barbequeue.worker.backends import inmem
+from iceqube.common.classes import Job
+from iceqube.messaging.backends.inmem import MessagingBackend
+from iceqube.messaging.classes import MessageType
+from iceqube.async import Event
+from iceqube.worker.backends import inmem
 
 
 @pytest.fixture
