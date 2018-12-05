@@ -1,10 +1,11 @@
 import logging
 
 from iceqube.common.six.moves.queue import Full
-
 from iceqube.common.utils import InfiniteLoopThread
-from iceqube.messaging.classes import Message, MessageType, CancelMessage
-from iceqube.async import Event
+from iceqube.compat import Event
+from iceqube.messaging.classes import CancelMessage
+from iceqube.messaging.classes import Message
+from iceqube.messaging.classes import MessageType
 
 
 class Scheduler(object):
@@ -99,8 +100,8 @@ class Scheduler(object):
             self.storage_backend.mark_job_as_queued(next_job.job_id)
         except Full:
             logging.debug(
-                "Worker queue full; skipping scheduling of job {} for now.".
-                    format(next_job.job_id))
+                "Worker queue full; skipping scheduling of job {} for now.".format(next_job.job_id)
+            )
             return
 
     def handle_worker_messages(self, timeout):
