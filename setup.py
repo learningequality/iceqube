@@ -1,4 +1,14 @@
+import os
+import sys
+
 from setuptools import setup
+
+# Add the package source
+sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
+
+# Import our package
+import iceqube  # noqa
+
 
 setup(
     author='Learning Equality',
@@ -36,6 +46,6 @@ setup(
         'iceqube.worker.backends'
     ],
     url='https://github.com/learningequality/iceqube',
-    version='0.0.5',
+    version=iceqube.__version__,
     zip_safe=True
 )
