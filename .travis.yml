@@ -2,22 +2,34 @@
 
 language: python
 
-sudo: false
+cache: pip
 
-cache:
-  directories:
-    - .pants.d
-    - $HOME/.cache/pants
-
-python:
-  - "2.7"
-  - "3.4"
-  - "3.5"
-  - "3.6"
+include:
+  - python: 2.7
+    dist: trusty
+    sudo: false
+  - python: 3.4
+    dist: trusty
+    sudo: false
+  - python: 3.5
+    dist: trusty
+    sudo: false
+  - python: 3.6
+    dist: trusty
+    sudo: false
+  - python: 3.7
+    dist: xenial
+    sudo: true
+  - python: pypy
+    dist: trusty
+    sudo: false
 
 # command to run tests, e.g. python setup.py test
+install:
+  - pip install tox tox-travis codecov
+
 script:
-  - make test
+  - tox
 
 after_success:
   - codecov

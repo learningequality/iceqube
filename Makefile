@@ -15,4 +15,7 @@ release: dist
 	twine upload dist/iceqube-*.{whl,tar.gz}
 
 test:
-	./pants test :tests
+	py.test
+
+test-all:
+	tox

@@ -3,12 +3,13 @@ import time
 import uuid
 
 import pytest
-
 from iceqube.client import SimpleClient
-from iceqube.common.classes import Job, State
-from iceqube.common.utils import import_stringified_func, stringify_func
+from iceqube.common.classes import Job
+from iceqube.common.classes import State
+from iceqube.common.utils import import_stringified_func
+from iceqube.common.utils import stringify_func
+from iceqube.compat import Event
 from iceqube.storage.backends import inmem
-from iceqube.async import Event
 
 
 @pytest.fixture
@@ -219,8 +220,12 @@ class TestClient(object):
     def test_can_cancel_a_job(self, inmem_client):
         is_running_event = EventProxy()
         is_not_canceled_event = EventProxy()
-        job_id = inmem_client.schedule(cancelable_job, is_running_event=is_running_event,
-                                    is_not_canceled_event=is_not_canceled_event, cancellable=True)
+        job_id = inmem_client.schedule(
+            cancelable_job,
+            is_running_event=is_running_event,
+            is_not_canceled_event=is_not_canceled_event,
+            cancellable=True
+        )
 
         is_running_event.wait(1.0)
         # Job should be running after this point
