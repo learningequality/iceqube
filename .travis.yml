@@ -4,25 +4,26 @@ language: python
 
 cache: pip
 
-include:
-  - python: 2.7
-    dist: trusty
-    sudo: false
-  - python: 3.4
-    dist: trusty
-    sudo: false
-  - python: 3.5
-    dist: trusty
-    sudo: false
-  - python: 3.6
-    dist: trusty
-    sudo: false
-  - python: 3.7
-    dist: xenial
-    sudo: true
-  - python: pypy
-    dist: trusty
-    sudo: false
+matrix:
+  include:
+    - python: 2.7
+      dist: trusty
+      sudo: false
+    - python: 3.4
+      dist: trusty
+      sudo: false
+    - python: 3.5
+      dist: trusty
+      sudo: false
+    - python: 3.6
+      dist: trusty
+      sudo: false
+    - python: 3.7
+      dist: xenial
+      sudo: true
+    - python: pypy
+      dist: trusty
+      sudo: false
 
 # command to run tests, e.g. python setup.py test
 install:
