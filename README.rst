@@ -3,8 +3,8 @@ Iceqube
 
 .. image:: https://badge.fury.io/py/iceqube.svg
    :target: https://pypi.python.org/pypi/iceqube/
-.. image:: https://travis-ci.org/learningequality/iceqube.svg
-  :target: https://travis-ci.org/learningequality/iceqube
+.. image:: https://travis-ci.com/learningequality/iceqube.svg
+  :target: https://travis-ci.com/learningequality/iceqube
 .. image:: http://codecov.io/github/learningequality/iceqube/coverage.svg?branch=master
   :target: http://codecov.io/github/learningequality/iceqube?branch=master
 .. image:: https://readthedocs.org/projects/iceqube/badge/?version=latest
