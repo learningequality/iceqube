@@ -151,6 +151,11 @@ class StorageBackend(BaseBackend):
         jobs = self._ns_query(s).filter_by(state=State.SCHEDULED).order_by(ORMJob.queue_order)
         return [job.obj for job in jobs]
 
+    def get_canceling_jobs(self):
+        s = self.sessionmaker()
+        jobs = self._ns_query(s).filter_by(state=State.CANCELING).order_by(ORMJob.queue_order)
+        return [job.obj for job in jobs]
+
     def get_all_jobs(self):
         s = self.sessionmaker()
         orm_jobs = self._ns_query(s).all()

@@ -1,16 +1,12 @@
-import uuid
-
 from iceqube.common.classes import Job, State
-from iceqube.messaging.backends import inmem as messaging_inmem
-from iceqube.scheduler.classes import Scheduler
 from iceqube.storage.backends import inmem as storage_inmem
-from iceqube.worker.backends import inmem
+
+MEMORY = storage_inmem.StorageBackend.MEMORY
 
 
 class Client(object):
-    def __init__(self, app, namespace, **config):
-        self.storage = config['storage_backend']
-        self.scheduler = config['scheduler']
+    def __init__(self, app, storage_path=MEMORY):
+        self.storage = storage_inmem.StorageBackend(app, app, storage_path)
 
     def schedule(self, func, *args, **kwargs):
         """
@@ -53,12 +49,12 @@ class Client(object):
 
     def cancel(self, job_id):
         """
-        Mark a job as canceled and remove it from the list of jobs to be executed.
-        Send a message to our workers to stop a job.
+        Mark a job as canceling, and let the scheduler pick this up to initiate
+        the cancel of the job.
 
         :param job_id: the job_id of the Job to cancel.
         """
-        self.scheduler.request_job_cancel(job_id)
+        self.storage.mark_job_as_canceling(job_id)
 
     def all_jobs(self):
         """
@@ -115,70 +111,3 @@ class Client(object):
         :param force: Whether to clear all jobs from the job storage queue, regardless if they've been completed or not.
         """
         self.storage.clear(force=force)
-
-
-class SimpleClient(Client):
-    # types of workers we can spawn
-    PROCESS_BASED = inmem.WorkerBackend.PROCESS
-    THREAD_BASED = inmem.WorkerBackend.THREAD
-
-    # specify if we want our storage backend to be in-memory
-    MEMORY = storage_inmem.StorageBackend.MEMORY
-
-    def __init__(self, app, worker_type=THREAD_BASED, storage_path=MEMORY):
-        # simplify configuration by making app and namespace the same thing
-        namespace = app
-
-        self.worker_mailbox_name = uuid.uuid4().hex
-        self.scheduler_mailbox_name = uuid.uuid4().hex
-        self._storage = storage_inmem.StorageBackend(app, app, storage_path)
-        self._messaging = messaging_inmem.MessagingBackend()
-        self._workers = inmem.WorkerBackend(
-            incoming_message_mailbox=self.worker_mailbox_name,
-            outgoing_message_mailbox=self.scheduler_mailbox_name,
-            msgbackend=self._messaging,
-            worker_type=worker_type)
-        self._scheduler = Scheduler(
-            self._storage,
-            self._messaging,
-            worker_mailbox=self.worker_mailbox_name,
-            incoming_mailbox=self.scheduler_mailbox_name)
-
-        super(SimpleClient, self).__init__(
-            app, namespace, storage_backend=self._storage,
-            scheduler=self._scheduler)
-
-    def shutdown(self):
-        """
-        Shutdown the client and all of its managed resources:
-
-        - the workers
-        - the scheduler threads
-
-        :return: None
-        """
-        self._storage.clear()
-        self._scheduler.shutdown(wait=False)
-        self._workers.shutdown(wait=False)
-
-
-class InMemClient(SimpleClient):
-    """
-    A client that starts and runs all jobs in memory. In particular, the following iceqube components are all
-    running
-    their in-memory counterparts:
-
-    - Scheduler
-    - Job storage
-    - Workers
-    """
-
-    def __init__(self, app, *args, **kwargs):
-        super(InMemClient, self).__init__(
-            app,
-            worker_type=self.THREAD_BASED,
-            storage_path=self.MEMORY,
-            *args,
-            **kwargs)
-
-
