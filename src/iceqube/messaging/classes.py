@@ -1,4 +1,3 @@
-import json
 from collections import namedtuple
 
 
@@ -26,7 +25,7 @@ class Message(namedtuple("_Message", ["type", "message"])):
             t.value for t in list(MessageType)
         ), "Message type not found in predetermined message type list!"
 
-        return json.dumps({"type": self.type, "messsage": self.message})
+        return {"type": self.type, "message": self.message}
 
 
 class SuccessMessage(Message):
