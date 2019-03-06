@@ -1,4 +1,7 @@
+from iceqube.common import WORKER_MAILBOX
 from iceqube.common.classes import Job, State
+from iceqube.messaging.backends import inmem as messaging_inmem
+from iceqube.messaging.classes import CancelMessage
 from iceqube.storage.backends import inmem as storage_inmem
 
 MEMORY = storage_inmem.StorageBackend.MEMORY
@@ -7,6 +10,8 @@ MEMORY = storage_inmem.StorageBackend.MEMORY
 class Client(object):
     def __init__(self, app, storage_path=MEMORY):
         self.storage = storage_inmem.StorageBackend(app, app, storage_path)
+        self.worker_mailbox = WORKER_MAILBOX.format(app=app)
+        self.messaging = messaging_inmem.MessagingBackend(mailboxes=[self.worker_mailbox])
 
     def schedule(self, func, *args, **kwargs):
         """
@@ -54,6 +59,8 @@ class Client(object):
 
         :param job_id: the job_id of the Job to cancel.
         """
+        msg = CancelMessage(job_id)
+        self.messaging.send(self.worker_mailbox, msg)
         self.storage.mark_job_as_canceling(job_id)
 
     def all_jobs(self):

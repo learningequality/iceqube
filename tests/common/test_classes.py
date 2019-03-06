@@ -3,7 +3,8 @@ import time
 import uuid
 
 import pytest
-from iceqube.client import SimpleClient
+from iceqube.engine import Engine
+from iceqube.client import Client
 from iceqube.common.classes import Job
 from iceqube.common.classes import State
 from iceqube.common.utils import import_stringified_func
@@ -23,9 +24,10 @@ def backend():
 @pytest.fixture
 def inmem_client():
     with tempfile.NamedTemporaryFile() as f:
-        c = SimpleClient(app="pytest", storage_path=f.name)
+        e = Engine(app="pytest", storage_path=f.name)
+        c = Client(app="pytest", storage_path=f.name)
         yield c
-        c.shutdown()
+        e.shutdown()
 
 
 @pytest.fixture
@@ -60,9 +62,10 @@ def cancelable_job(is_running_event, is_not_canceled_event, check_for_cancel=Non
 
     is_running_event.set()  # mark the job as running
 
-    for _ in range(3):
+    for _ in range(10):
         time.sleep(0.5)
-        check_for_cancel()
+        if check_for_cancel():
+            return
 
     is_not_canceled_event.set()
 
@@ -175,7 +178,7 @@ class TestClient(object):
         # sleep for half a second to make us switch to another thread
         time.sleep(0.5)
         try:
-            inmem_client._storage.wait_for_job_update(job_id, timeout=2)
+            inmem_client.storage.wait_for_job_update(job_id, timeout=2)
         except Exception:
             # welp, maybe a job update happened in between that schedule call and the wait call.
             # at least we waited!
@@ -197,14 +200,14 @@ class TestClient(object):
             make_job_updates, flag, track_progress=True)
 
         for i in range(2):
-            inmem_client._storage.wait_for_job_update(job_id, timeout=2)
+            inmem_client.storage.wait_for_job_update(job_id, timeout=2)
             job = inmem_client.status(job_id)
             assert job.state in [State.QUEUED, State.RUNNING, State.COMPLETED]
 
     def test_can_get_notified_of_job_failure(self, inmem_client):
         job_id = inmem_client.schedule(failing_func)
 
-        job = inmem_client._storage.wait_for_job_update(job_id, timeout=2)
+        job = inmem_client.storage.wait_for_job_update(job_id, timeout=2)
         assert job.state in [State.QUEUED, State.FAILED]
 
     def test_stringify_func_is_importable(self):
@@ -237,6 +240,6 @@ class TestClient(object):
         assert job.state == State.CANCELING
 
         # Let's wait for another job state change...
-        job = inmem_client.wait_for_completion(job_id, timeout=2.0)
+        job = inmem_client.wait_for_completion(job_id, timeout=10.0)
         # and hopefully it's canceled by this point
         assert job.state == State.CANCELED

@@ -80,16 +80,12 @@ class Scheduler(object):
 
     def schedule_next_job(self):
         """
-        Clear any jobs marked for canceling.
         Get the next job in the queue to be scheduled, and send a message
         to the workers to start the job.
         Returns: None
 
         """
-
-        for job in self.storage_backend.get_canceling_jobs():
-            self.request_job_cancel(job.id)
-
+        
         next_job = self.storage_backend.get_next_scheduled_job()
         # TODO: don't loop over if workers are already all running
 
