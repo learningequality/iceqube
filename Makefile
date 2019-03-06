@@ -4,6 +4,22 @@ help:
 	@echo "dist - package"
 	@echo "test - run the entire test suite"
 
+clean: clean-build clean-pyc
+
+clean-build:
+	rm -fr build/
+	rm -fr dist/
+	rm -fr dist-packages-cache/
+	rm -fr dist-packages-temp/
+	rm -fr *.egg-info
+	rm -fr .eggs
+	rm -fr .cache
+
+clean-pyc:
+	find . -name '*.pyc' -exec rm -f {} +
+	find . -name '*.pyo' -exec rm -f {} +
+	find . -name '*~' -exec rm -f {} +
+
 dist:
 	rm -r dist/*
 	./pants setup-py src:lib
