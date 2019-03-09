@@ -3,4 +3,4 @@ include CONTRIBUTING.rst
 include CHANGELOG.rst
 include LICENSE
 include README.rst
-recursive-exclude exercise_perseus_renderer/* *pyc
+recursive-exclude *pyc
