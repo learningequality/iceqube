@@ -44,7 +44,7 @@ def construct_message(queue, message):
     if len(message) > 99999999:  # 100 MB max int that can fit in message header (8 characters, plus two controls)
         raise ValueError('Message cannot be 100MB or larger')
 
-    return MESSAGE_SEPARATOR + str(len(message) + len(queue) + 1) + MESSAGE_SEPARATOR + queue + MESSAGE_SEPARATOR + message
+    return (MESSAGE_SEPARATOR + str(len(message) + len(queue) + 1) + MESSAGE_SEPARATOR + queue + MESSAGE_SEPARATOR + message).encode()
 
 
 def send_message(socket, queue, message):
