@@ -4,5 +4,7 @@ try:
     # Proxy Process to Thread to allow seamless substitution
     from multiprocessing import Process as Thread  # noqa
     from multiprocessing import Event  # noqa
+    MULTIPROCESS = True
 except ImportError:
     from threading import Thread, Event  # noqa
+    MULTIPROCESS = False

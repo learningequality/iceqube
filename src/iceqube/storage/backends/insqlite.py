@@ -1,6 +1,5 @@
 import logging
 import uuid
-from collections import defaultdict, deque
 from copy import copy
 
 from sqlalchemy import Column, DateTime, Index, Integer, PickleType, String, create_engine, event, func, or_
@@ -10,9 +9,6 @@ from sqlalchemy.pool import NullPool, StaticPool
 
 from iceqube.common.classes import State
 from iceqube.storage.backends.default import BaseBackend
-
-INMEM_STORAGE = {}
-INMEM_QUEUE = defaultdict(lambda: deque())
 
 Base = declarative_base()
 

@@ -10,13 +10,13 @@ from iceqube.common.classes import State
 from iceqube.common.utils import import_stringified_func
 from iceqube.common.utils import stringify_func
 from iceqube.compat import Event
-from iceqube.storage.backends import inmem
+from iceqube.storage.backends import insqlite
 
 
 @pytest.fixture
 def backend():
     with tempfile.NamedTemporaryFile() as f:
-        b = inmem.StorageBackend(app="pytest", namespace="test", storage_path=f.name)
+        b = insqlite.StorageBackend(app="pytest", namespace="test", storage_path=f.name)
         yield b
         b.clear()
 

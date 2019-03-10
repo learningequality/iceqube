@@ -2,13 +2,13 @@ import pytest
 
 from iceqube.common.classes import Job, State
 from iceqube.common.utils import stringify_func
-from iceqube.storage.backends import inmem
+from iceqube.storage.backends import insqlite
 
 
 @pytest.fixture
 def defaultbackend():
-    backend = inmem.StorageBackend(
-        'pytest', 'pytest', storage_path=inmem.StorageBackend.MEMORY)
+    backend = insqlite.StorageBackend(
+        'pytest', 'pytest', storage_path=insqlite.StorageBackend.MEMORY)
     yield backend
     backend.clear()
 

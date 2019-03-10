@@ -1,17 +1,19 @@
+from iceqube.compat import MULTIPROCESS
 from iceqube.common import WORKER_MAILBOX
 from iceqube.common.classes import Job, State
 from iceqube.messaging.backends import inmem as messaging_inmem
+from iceqube.messaging.backends import insocket as messaging_insocket
 from iceqube.messaging.classes import CancelMessage
-from iceqube.storage.backends import inmem as storage_inmem
+from iceqube.storage.backends import insqlite as storage_insqlite
 
-MEMORY = storage_inmem.StorageBackend.MEMORY
+MEMORY = storage_insqlite.StorageBackend.MEMORY
 
 
 class Client(object):
-    def __init__(self, app, storage_path=MEMORY):
-        self.storage = storage_inmem.StorageBackend(app, app, storage_path)
+    def __init__(self, app, storage_path=MEMORY, messaging=messaging_inmem.MessagingBackend):
+        self.storage = storage_insqlite.StorageBackend(app, app, storage_path)
         self.worker_mailbox = WORKER_MAILBOX.format(app=app)
-        self.messaging = messaging_inmem.MessagingBackend(mailboxes=[self.worker_mailbox])
+        self.messaging = messaging(mailboxes=[self.worker_mailbox])
 
     def schedule(self, func, *args, **kwargs):
         """
@@ -118,3 +120,11 @@ class Client(object):
         :param force: Whether to clear all jobs from the job storage queue, regardless if they've been completed or not.
         """
         self.storage.clear(force=force)
+
+
+class NoConfigClient(Client):
+    def __init__(self, app, *args, **kwargs):
+        if MULTIPROCESS:
+            super(NoConfigClient, self).__init__(app, messaging=messaging_insocket.MessagingBackend, *args, **kwargs)
+        else:
+            super(NoConfigClient, self).__init__(app, *args, **kwargs)
