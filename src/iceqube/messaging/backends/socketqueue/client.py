@@ -35,6 +35,8 @@ class Queue(object):
 
     def _close(self):
         if self._socket:
+            # Do this to attempt to ensure a timely shutdown.
+            self._socket.shutdown(socket.SHUT_RDWR)
             self._socket.close()
             self._socket = None
 
