@@ -121,6 +121,14 @@ class Client(object):
         """
         self.storage.clear(force=force)
 
+    def clear_job(self, job_id, force=False):
+        """
+        Clear all jobs that have succeeded or failed.
+        :type force: bool
+        :param force: Whether to clear all jobs from the job storage queue, regardless if they've been completed or not.
+        """
+        self.storage.clear(job_id=job_id, force=force)
+
 
 class NoConfigClient(Client):
     def __init__(self, app, *args, **kwargs):
