@@ -1,23 +1,16 @@
-from iceqube.compat import MULTIPROCESS
-from iceqube.common import WORKER_MAILBOX
 from iceqube.common.classes import Job, State
-from iceqube.messaging.backends import inmem as messaging_inmem
-from iceqube.messaging.backends import insocket as messaging_insocket
-from iceqube.messaging.classes import CancelMessage
 from iceqube.storage.backends import insqlite as storage_insqlite
 
 MEMORY = storage_insqlite.StorageBackend.MEMORY
 
 
 class Client(object):
-    def __init__(self, app, storage_path=MEMORY, messaging=messaging_inmem.MessagingBackend):
+    def __init__(self, app, storage_path=MEMORY):
         self.storage = storage_insqlite.StorageBackend(app, app, storage_path)
-        self.worker_mailbox = WORKER_MAILBOX.format(app=app)
-        self.messaging = messaging(mailboxes=[self.worker_mailbox])
 
-    def schedule(self, func, *args, **kwargs):
+    def enqueue(self, func, *args, **kwargs):
         """
-        Schedules a function func for execution.
+        Enqueues a function func for execution.
 
         One special parameter is track_progress. If passed in and not None, the func will be passed in a
         keyword parameter called update_progress:
@@ -51,18 +44,16 @@ class Client(object):
         job.track_progress = kwargs.pop('track_progress', False)
         job.cancellable = kwargs.pop('cancellable', False)
         job.extra_metadata = kwargs.pop('extra_metadata', {})
-        job_id = self.storage.schedule_job(job)
+        job_id = self.storage.enqueue_job(job)
         return job_id
 
     def cancel(self, job_id):
         """
-        Mark a job as canceling, and let the scheduler pick this up to initiate
+        Mark a job as canceling, and let the worker pick this up to initiate
         the cancel of the job.
 
         :param job_id: the job_id of the Job to cancel.
         """
-        msg = CancelMessage(job_id)
-        self.messaging.send(self.worker_mailbox, msg)
         self.storage.mark_job_as_canceling(job_id)
 
     def all_jobs(self):
@@ -88,31 +79,6 @@ class Client(object):
         """
         return self.storage.get_job(job_id)
 
-    def wait(self, job_id, timeout=None):
-        """
-        Wait until the job given by job_id has a new update.
-
-        :param job_id: the id of the job to wait for.
-        :param timeout: how long to wait for a job state change before timing out.
-        :return: Job object corresponding to job_id
-        """
-        return self.storage.wait_for_job_update(job_id, timeout=timeout)
-
-    def wait_for_completion(self, job_id, timeout=None):
-        """
-        Wait for the job given by job_id to change to COMPLETED or CANCELED. Raises a
-        iceqube.exceptions.TimeoutError if timeout is exceeded before each job change.
-
-        :param job_id: the id of the job to wait for.
-        :param timeout: how long to wait for a job state change before timing out.
-        """
-        while 1:
-            job = self.wait(job_id, timeout=timeout)
-            if job.state in [State.COMPLETED, State.FAILED, State.CANCELED]:
-                return job
-            else:
-                continue
-
     def clear(self, force=False):
         """
         Clear all jobs that have succeeded or failed.
@@ -128,11 +94,3 @@ class Client(object):
         :param force: Whether to clear all jobs from the job storage queue, regardless if they've been completed or not.
         """
         self.storage.clear(job_id=job_id, force=force)
-
-
-class NoConfigClient(Client):
-    def __init__(self, app, *args, **kwargs):
-        if MULTIPROCESS:
-            super(NoConfigClient, self).__init__(app, messaging=messaging_insocket.MessagingBackend, *args, **kwargs)
-        else:
-            super(NoConfigClient, self).__init__(app, *args, **kwargs)

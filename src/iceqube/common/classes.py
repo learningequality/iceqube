@@ -60,7 +60,7 @@ class Job(object):
         or it can be an importable string already.
         """
         self.job_id = kwargs.pop('job_id', None)
-        self.state = kwargs.pop('state', State.SCHEDULED)
+        self.state = kwargs.pop('state', State.QUEUED)
         self.traceback = ""
         self.exception = None
         self.track_progress = kwargs.pop('track_progress', False)

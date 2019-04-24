@@ -7,6 +7,7 @@ class BaseError(Exception):
     """
     pass
 
+
 class TimeoutError(BaseError):
     """
     An error raised by iceqube.storage.wait() when no job updates come in.

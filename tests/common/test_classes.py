@@ -36,38 +36,27 @@ def simplejob():
 
 
 @pytest.fixture
-def scheduled_job(inmem_client, simplejob):
-    job_id = inmem_client.schedule(simplejob)
+def enqueued_job(inmem_client, simplejob):
+    job_id = inmem_client.enqueue(simplejob)
     return inmem_client.storage.get_job(job_id)
 
 
-def cancelable_job(is_running_event, is_not_canceled_event, check_for_cancel=None):
+def cancelable_job(check_for_cancel=None):
     """
     Test function for checking if a job is cancelable. Meant to be used in a job cancel
     test case.
 
-    When first run, it calls the .set() function in the is_running_event passed in. This
-    is meant to alert the test case that it started to run.
+    It then calls the check_for_cancel, followed by a time.sleep function, 3 times. 
 
-    It then calls the check_for_cancel, followed by a time.sleep function, 3 times. If it still
-    continues (i.e. it did not recieve any cancel request), it then .set()s the is_not_canceled_event,
-    alerting the test case that it waasn't canceled.
-
-    :param is_running_event: An Event or EventProxy that the function sets when it starts running.
-    :param is_not_canceled_event: An Event or EventProxy that the function sets when it runs to completion.
     :param check_for_cancel: A function that the BBQ framework passes in when a job is set to be cancellable.
     Calling this function makes the thread check if a cancellation has been requested, and then exits early if true.
     :return: None
     """
 
-    is_running_event.set()  # mark the job as running
-
     for _ in range(10):
         time.sleep(0.5)
         if check_for_cancel():
             return
-
-    is_not_canceled_event.set()
 
 
 FLAG = False
@@ -156,21 +145,21 @@ def failing_func():
 
 
 class TestClient(object):
-    def test_schedules_a_function(self, inmem_client):
-        job_id = inmem_client.schedule(id, 1)
+    def test_enqueues_a_function(self, inmem_client):
+        job_id = inmem_client.enqueue(id, 1)
 
         # is the job recorded in the chosen backend?
         assert inmem_client.status(job_id).job_id == job_id
 
-    def test_schedule_preserves_extra_metadata(self, inmem_client):
+    def test_enqueue_preserves_extra_metadata(self, inmem_client):
         metadata = {"saved": True}
-        job_id = inmem_client.schedule(id, 1, extra_metadata=metadata)
+        job_id = inmem_client.enqueue(id, 1, extra_metadata=metadata)
 
         # Do we get back the metadata we save?
         assert inmem_client.status(job_id).extra_metadata == metadata
 
-    def test_schedule_runs_function(self, inmem_client, flag):
-        job_id = inmem_client.schedule(set_flag, flag)
+    def test_enqueue_runs_function(self, inmem_client, flag):
+        job_id = inmem_client.enqueue(set_flag, flag)
 
         flag.wait(timeout=5)
         assert flag.is_set()
@@ -180,23 +169,23 @@ class TestClient(object):
         try:
             inmem_client.storage.wait_for_job_update(job_id, timeout=2)
         except Exception:
-            # welp, maybe a job update happened in between that schedule call and the wait call.
+            # welp, maybe a job update happened in between that enqueue call and the wait call.
             # at least we waited!
             pass
         job = inmem_client.status(job_id)
         assert job.state == State.COMPLETED
 
-    def test_schedule_can_run_n_functions(self, inmem_client):
+    def test_enqueue_can_run_n_functions(self, inmem_client):
         n = 10
         events = [EventProxy() for _ in range(n)]
         for e in events:
-            inmem_client.schedule(set_flag, e)
+            inmem_client.enqueue(set_flag, e)
 
         for e in events:
             assert e.wait(timeout=2)
 
-    def test_scheduled_job_can_receive_job_updates(self, inmem_client, flag):
-        job_id = inmem_client.schedule(
+    def test_enqueued_job_can_receive_job_updates(self, inmem_client, flag):
+        job_id = inmem_client.enqueue(
             make_job_updates, flag, track_progress=True)
 
         for i in range(2):
@@ -205,7 +194,7 @@ class TestClient(object):
             assert job.state in [State.QUEUED, State.RUNNING, State.COMPLETED]
 
     def test_can_get_notified_of_job_failure(self, inmem_client):
-        job_id = inmem_client.schedule(failing_func)
+        job_id = inmem_client.enqueue(failing_func)
 
         job = inmem_client.storage.wait_for_job_update(job_id, timeout=2)
         assert job.state in [State.QUEUED, State.FAILED]
@@ -216,21 +205,20 @@ class TestClient(object):
 
         assert set_flag == func
 
-    def test_can_get_job_details(self, inmem_client, scheduled_job):
+    def test_can_get_job_details(self, inmem_client, enqueued_job):
         assert inmem_client.status(
-            scheduled_job.job_id).job_id == scheduled_job.job_id
+            enqueued_job.job_id).job_id == enqueued_job.job_id
 
     def test_can_cancel_a_job(self, inmem_client):
-        is_running_event = EventProxy()
-        is_not_canceled_event = EventProxy()
-        job_id = inmem_client.schedule(
+        job_id = inmem_client.enqueue(
             cancelable_job,
-            is_running_event=is_running_event,
-            is_not_canceled_event=is_not_canceled_event,
             cancellable=True
         )
 
-        is_running_event.wait(1.0)
+        job = inmem_client.status(job_id)
+        while job.state != State.RUNNING:
+            time.sleep(0.1)
+            job = inmem_client.status(job_id)
         # Job should be running after this point
 
         # Now let's cancel...
@@ -239,7 +227,8 @@ class TestClient(object):
         job = inmem_client.status(job_id)
         assert job.state == State.CANCELING
 
-        # Let's wait for another job state change...
-        job = inmem_client.wait_for_completion(job_id, timeout=10.0)
+        while job.state != State.CANCELED:
+            time.sleep(0.1)
+            job = inmem_client.status(job_id)
         # and hopefully it's canceled by this point
         assert job.state == State.CANCELED

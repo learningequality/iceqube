@@ -1,48 +1,38 @@
+import logging
 import traceback
 
 from concurrent.futures import CancelledError
 from concurrent.futures._base import CANCELLED_AND_NOTIFIED, CANCELLED
 
+from iceqube.common.six.moves.queue import Empty
+from iceqube.common.utils import InfiniteLoopThread
 from iceqube.exceptions import UserCancelledError
-from iceqube.worker.backends.base import BaseWorkerBackend
 
 
-class WorkerBackend(BaseWorkerBackend):
+logger = logging.getLogger(__name__)
+
+
+class WorkerBackend(object):
     # worker types
     PROCESS = 1
     THREAD = 0
 
-    def __init__(self, worker_type=THREAD, *args, **kwargs):
-        # Internally, we use conncurrent.future.Future to run and track
+    def __init__(self, storage_backend, num_workers=3, worker_type=THREAD, *args, **kwargs):
+        # Internally, we use concurrent.future.Future to run and track
         # job executions. We need to keep track of which future maps to which
         # job they were made from, and we use the job_future_mapping dict to do
         # so.
+
+        # Key: future object, Value: job object
         self.job_future_mapping = {}
+        # Key: job_id, Value: future object
         self.future_job_mapping = {}
         self.worker_type = worker_type
-        super(WorkerBackend, self).__init__(*args, **kwargs)
+        self.storage_backend = storage_backend
+        self.num_workers = num_workers
 
-    def schedule_job(self, job_id):
-        """
-        schedule a job to the type of workers spawned by self.start_workers.
-
-
-        :param job_id: the id of the job to schedule for running.
-        :return:
-        """
-        job = self.storage_backend.get_job(job_id)
-        l = _reraise_with_traceback(job.get_lambda_to_execute())
-
-        future = self.workers.submit(l, update_progress_func=self.update_progress, cancel_job_func=self._check_for_cancel)
-
-        # assign the futures to a dict, mapping them to a job
-        self.job_future_mapping[future] = job
-        self.future_job_mapping[job.job_id] = future
-
-        # callback for when the future is now!
-        future.add_done_callback(self.handle_finished_future)
-
-        return future
+        self.workers = self.start_workers(num_workers=self.num_workers)
+        self.job_checker = self.start_job_checker()
 
     def shutdown_workers(self, wait=True):
         self.workers.shutdown(wait=wait)
@@ -66,6 +56,10 @@ class WorkerBackend(BaseWorkerBackend):
         # get back the job assigned to the future
         job = self.job_future_mapping[future]
 
+        # Clean up tracking of this job and its future
+        del self.job_future_mapping[future]
+        del self.future_job_mapping[job.job_id]
+
         try:
             result = future.result()
         except CancelledError as e:
@@ -77,6 +71,77 @@ class WorkerBackend(BaseWorkerBackend):
             return
 
         self.report_success(job, result)
+
+    def shutdown(self, wait=False):
+        self.job_checker.stop()
+        self.shutdown_workers(wait=wait)
+
+    def start_job_checker(self):
+        """
+        Starts up the job checker thread, that starts scheduled jobs when there are workers free,
+        and checks for cancellation requests for jobs currently assigned to a worker.
+        Returns: the Thread object.
+        """
+        t = InfiniteLoopThread(self.check_jobs, thread_name="JOBCHECKER", wait_between_runs=0.5)
+        t.start()
+        return t
+
+    def check_jobs(self):
+        """
+        Check how many workers are currently running.
+        If fewer workers are running than there are available workers, start a new job!
+        Returns: None
+        """
+        try:
+            while len(self.future_job_mapping.keys()) < self.num_workers:
+                self.start_next_job()
+        except Empty:
+            logger.debug("No jobs to start.")
+        cancelling_jobs = [job.job_id for job in self.storage_backend.get_canceling_jobs()]
+        if cancelling_jobs:
+            for job_id in self.future_job_mapping.keys():
+                if job_id in cancelling_jobs:
+                    self.cancel(job_id)
+
+    def report_cancelled(self, job, last_stage):
+        self.storage_backend.mark_job_as_canceled(job.job_id)
+
+    def report_success(self, job, result):
+        self.storage_backend.complete_job(job.job_id)
+
+    def report_error(self, job, exc, trace):
+        trace = traceback.format_exc()
+        logger.error("Job {} raised an exception: {}".format(job.job_id, trace))
+        self.storage_backend.mark_job_as_failed(job.job_id, exc, trace)
+
+    def update_progress(self, job_id, progress, total_progress, stage=""):
+        self.storage_backend.update_job_progress(job_id, progress, total_progress)
+
+    def start_next_job(self):
+        """
+        start the next scheduled job to the type of workers spawned by self.start_workers.
+
+        :return future:
+        """
+        job = self.storage_backend.get_next_queued_job()
+
+        if not job:
+            raise Empty
+
+        self.storage_backend.mark_job_as_running(job.job_id)
+
+        l = _reraise_with_traceback(job.get_lambda_to_execute())
+
+        future = self.workers.submit(l, update_progress_func=self.update_progress, cancel_job_func=self._check_for_cancel)
+
+        # assign the futures to a dict, mapping them to a job
+        self.job_future_mapping[future] = job
+        self.future_job_mapping[job.job_id] = future
+
+        # callback for when the future is now!
+        future.add_done_callback(self.handle_finished_future)
+
+        return future
 
     def cancel(self, job_id):
         """

@@ -1,6 +1,7 @@
 import logging
 import uuid
 from copy import copy
+import time
 
 from sqlalchemy import Column, DateTime, Index, Integer, PickleType, String, create_engine, event, func, or_
 from sqlalchemy.ext.declarative import declarative_base
@@ -8,7 +9,7 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.pool import NullPool, StaticPool
 
 from iceqube.common.classes import State
-from iceqube.storage.backends.default import BaseBackend
+from iceqube.exceptions import TimeoutError
 
 Base = declarative_base()
 
@@ -45,7 +46,7 @@ class ORMJob(Base):
     __table_args__ = (Index('app_namespace_index', 'app', 'namespace'),)
 
 
-class StorageBackend(BaseBackend):
+class StorageBackend(object):
     # constant for specifying an in-memory DB
     MEMORY = 1
 
@@ -86,7 +87,7 @@ class StorageBackend(BaseBackend):
 
         event.listen(self.engine, "connect", _pragmas_on_connect)
 
-    def schedule_job(self, j):
+    def enqueue_job(self, j):
         """
         Add the job given by j to the job queue.
 
@@ -131,10 +132,10 @@ class StorageBackend(BaseBackend):
         job, _ = self._update_job_state(job_id, State.CANCELING)
         return job
 
-    def get_next_scheduled_job(self):
+    def get_next_queued_job(self):
         s = self.sessionmaker()
         orm_job = self._ns_query(s).filter_by(
-            state=State.SCHEDULED).order_by(ORMJob.queue_order).first()
+            state=State.QUEUED).order_by(ORMJob.queue_order).first()
         s.close()
         if orm_job:
             job = orm_job.obj
@@ -142,9 +143,9 @@ class StorageBackend(BaseBackend):
             job = None
         return job
 
-    def get_scheduled_jobs(self):
+    def get_queued_jobs(self):
         s = self.sessionmaker()
-        jobs = self._ns_query(s).filter_by(state=State.SCHEDULED).order_by(ORMJob.queue_order)
+        jobs = self._ns_query(s).filter_by(state=State.QUEUED).order_by(ORMJob.queue_order)
         return [job.obj for job in jobs]
 
     def get_canceling_jobs(self):
@@ -158,10 +159,11 @@ class StorageBackend(BaseBackend):
         s.close()
         return [o.obj for o in orm_jobs]
 
-    def get_job(self, job_id):
-        s = self.sessionmaker()
-        job, _ = self._get_job_and_orm_job(job_id, s)
-        s.close()
+    def get_job(self, job_id, session=None):
+        scoped_session = session if session else self.sessionmaker()
+        job, _ = self._get_job_and_orm_job(job_id, scoped_session)
+        if not session:  # session was created by our hand. Close it now.
+            scoped_session.close()
         return job
 
     def clear(self, job_id=None, force=False):
@@ -224,15 +226,6 @@ class StorageBackend(BaseBackend):
         session.close()
         return job_id
 
-    def mark_job_as_queued(self, job_id):
-        """
-        Change the job given by job_id to QUEUED.
-
-        :param job_id: the job to be marked as QUEUED.
-        :return: None
-        """
-        self._update_job_state(job_id, State.QUEUED)
-
     def mark_job_as_failed(self, job_id, exception, traceback):
         """
         Mark the job as failed, and record the traceback and exception.
@@ -294,7 +287,6 @@ class StorageBackend(BaseBackend):
         if not session:  # session was created by our hand. Close it now.
             scoped_session.commit()
             scoped_session.close()
-        self.notify_of_job_update(job_id)
         return job, orm_job
 
     def _get_job_and_orm_job(self, job_id, session):
@@ -311,3 +303,35 @@ class StorageBackend(BaseBackend):
         """
         return session.query(ORMJob).filter(ORMJob.app == self.app,
                                             ORMJob.namespace == self.namespace)
+
+    def wait_for_job_update(self, job_id, timeout=None):
+        """
+        Blocks until a job given by job_id has updated its state (canceled, completed, progress updated, etc.)
+        if timeout is not None, then this function raises iceqube.exceptions.TimeoutError.
+
+        :param job_id: the job's job_id to monitor for changes.
+        :param timeout: if None, wait forever for a job update. If given, wait until timeout seconds, and then raise
+        iceqube.exceptions.TimeoutError.
+        :return: the Job object corresponding to job_id.
+        """
+        # internally, we register an Event object for each entry in this function.
+        # when self.notify_of_job_update() is called, we call Event.set() on all events
+        # registered for that job, thereby releasing any threads waiting for that specific job.
+
+        session = self.sessionmaker()
+
+        job = self.get_job(job_id, session=session)
+
+        initial_state = job.state
+
+        # How long to wait between polling the job DB
+        interval = 0.1
+        waiting_time = 0
+        while timeout is not None and waiting_time < timeout:
+            time.sleep(interval)
+            waiting_time += interval
+            updated_job = self.get_job(job_id, session=session)
+            if updated_job.state != initial_state:
+                return job
+
+        raise TimeoutError("Job {} has not received any updates.".format(job_id))
