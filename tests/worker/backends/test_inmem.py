@@ -1,14 +1,16 @@
 import pytest
+import uuid
+
 from iceqube.common.classes import Job
-from iceqube.compat import Event
+from iceqube.common.classes import State
 from iceqube.messaging.backends.inmem import MessagingBackend
-from iceqube.messaging.classes import MessageType
+from iceqube.storage.backends.insqlite import StorageBackend
 from iceqube.worker.backends import inmem
 
 
 @pytest.fixture
 def mailbox():
-    return "pytest"
+    return uuid.uuid4().hex
 
 
 @pytest.fixture
@@ -17,41 +19,43 @@ def msgbackend():
 
 
 @pytest.fixture
-def worker(mailbox, msgbackend):
-    b = inmem.WorkerBackend(incoming_message_mailbox=mailbox, outgoing_message_mailbox=mailbox, msgbackend=msgbackend)
+def storage_backend():
+    return StorageBackend("test", "test", StorageBackend.MEMORY)
+
+
+@pytest.fixture
+def worker(mailbox, msgbackend, storage_backend):
+    b = inmem.WorkerBackend(incoming_message_mailbox=mailbox, outgoing_message_mailbox=mailbox, msgbackend=msgbackend, storage_backend=storage_backend)
     yield b
     b.shutdown()
 
 
-def set_flag(threading_flag):
-    threading_flag.set()
-
-
 class TestWorker:
     def test_schedule_job_runs_job(self, worker):
-        flag = Event()
-        job = Job(set_flag, flag)
-        worker.schedule_job(job)
+        job = Job(id, 9)
+        worker.storage_backend.schedule_job(job)
+        future = worker.schedule_job(job.job_id)
 
-        assert flag.wait(timeout=2)
+        job = worker.storage_backend.get_job(job.job_id)
 
-    def test_schedule_job_sends_message_on_success(self, worker, mocker):
-        mocker.spy(worker.msgbackend, 'send')
+        future.result()
+
+        assert job.state == State.COMPLETED
+
+    def test_schedule_job_writes_to_storage_on_success(self, worker, mocker):
+        mocker.spy(worker.storage_backend, 'complete_job')
 
         # this job should never fail.
         job = Job(id, 9)
-        future = worker.schedule_job(job)
+        worker.storage_backend.schedule_job(job)
+        future = worker.schedule_job(job.job_id)
         # wait for the result to finish
         future.result()
 
         # verify that we sent a message through our backend
-        assert worker.msgbackend.send.call_count == 1
+        assert worker.storage_backend.complete_job.call_count == 1
 
-        # verify that we passed in a success message,
-        # that includes the job_id, and the result
-        call_args = worker.msgbackend.send.call_args
-        message = call_args[0][1]
-        assert message.type == MessageType.JOB_COMPLETED
-        assert message.message['result'] == future.result()
-        # verify that we're sending the job_id in the message
-        assert message.message['job_id'] == job.job_id
+        call_args = worker.storage_backend.complete_job.call_args
+        job_id = call_args[0][0]
+        # verify that we're setting the correct job_id
+        assert job_id == job.job_id

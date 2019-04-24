@@ -27,6 +27,7 @@ class Engine(object):
             incoming_message_mailbox=self.worker_mailbox_name,
             outgoing_message_mailbox=self.scheduler_mailbox_name,
             msgbackend=self._messaging,
+            storage_backend=self._storage,
             worker_type=worker_type)
         self._scheduler = Scheduler(
             self._storage,

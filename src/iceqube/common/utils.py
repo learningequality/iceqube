@@ -2,9 +2,9 @@ import abc
 import importlib
 import logging
 import time
+import uuid
 
 from iceqube import compat
-from iceqube import humanhash
 from iceqube.common.six.moves import _thread as thread
 
 
@@ -79,7 +79,7 @@ class BaseCloseableThread(compat.Thread):
 
     @staticmethod
     def _generate_thread_id():
-        uid, _ = humanhash.uuid()
+        uid = uuid.uuid4().hex
         return uid
 
     def shutdown(self):

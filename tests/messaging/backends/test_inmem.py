@@ -1,4 +1,5 @@
 import pytest
+import uuid
 from iceqube.common.six.moves.queue import Empty
 from iceqube.messaging.backends import inmem
 from iceqube.messaging.classes import Message, MessageType
@@ -12,10 +13,9 @@ def defaultbackend():
     yield b
 
 
-@pytest.fixture(params=[MessageType.JOB_FAILED, MessageType.JOB_STARTED, MessageType.JOB_UPDATED,
-                        MessageType.JOB_COMPLETED, MessageType.START_JOB, MessageType.CANCEL_JOB])
+@pytest.fixture(params=[MessageType.START_JOB, MessageType.CANCEL_JOB])
 def msg(request):
-    m = Message(request.param, "doesntmatter")
+    m = Message(request.param, uuid.uuid4().hex)
     yield m
 
 
@@ -26,7 +26,7 @@ class TestBackend:
         newmsg = defaultbackend.pop(MAILBOX)
 
         assert newmsg.type == msg.type
-        assert newmsg.message == msg.message
+        assert newmsg.job_id == msg.job_id
 
     def test_new_instance_can_send_and_read_to_the_same_mailbox(self, defaultbackend, msg):
         defaultbackend.send(MAILBOX, msg)
@@ -36,7 +36,7 @@ class TestBackend:
         newmsg = otherbackend.pop(MAILBOX)
 
         assert newmsg.type == msg.type
-        assert newmsg.message == msg.message
+        assert newmsg.job_id == msg.job_id
 
     def test_pop_raise_empty_when_no_messages(self, defaultbackend):
 

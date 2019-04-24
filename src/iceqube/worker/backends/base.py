@@ -5,9 +5,7 @@ from abc import ABCMeta, abstractmethod
 from iceqube.common.six.moves import queue
 
 from iceqube.common.utils import InfiniteLoopThread
-from iceqube.messaging.classes import (
-    FailureMessage, MessageType, ProgressMessage, SuccessMessage,
-    JobCanceledMessage, )
+from iceqube.messaging.classes import MessageType
 
 logger = logging.getLogger(__name__)
 
@@ -15,17 +13,18 @@ logger = logging.getLogger(__name__)
 class BaseWorkerBackend(object):
     __metaclass__ = ABCMeta
 
-    def __init__(self, incoming_message_mailbox, outgoing_message_mailbox, msgbackend, num_workers=3, *args, **kwargs):
+    def __init__(self, incoming_message_mailbox, outgoing_message_mailbox, msgbackend, storage_backend, num_workers=3, *args, **kwargs):
         self.incoming_message_mailbox = incoming_message_mailbox
         self.outgoing_message_mailbox = outgoing_message_mailbox
         self.msgbackend = msgbackend
+        self.storage_backend = storage_backend
 
         self.workers = self.start_workers(num_workers=num_workers)
         self.message_processor = self.start_message_processing()
 
     @abstractmethod
-    def schedule_job(self, job):
-        """Manually schedule a job given by job."""
+    def schedule_job(self, job_id):
+        """Manually schedule a job given by job_id."""
         pass
 
     @abstractmethod
@@ -82,26 +81,22 @@ class BaseWorkerBackend(object):
 
         """
         if msg.type == MessageType.START_JOB:
-            job = msg.message['job']
-            self.schedule_job(job)
+            job_id = msg.job_id
+            self.schedule_job(job_id)
         elif msg.type == MessageType.CANCEL_JOB:
-            job_id = msg.message['job_id']
+            job_id = msg.job_id
             self.cancel(job_id)
 
     def report_cancelled(self, job, last_stage):
-        msg = JobCanceledMessage(job.job_id, is_successfully_canceled=True, last_stage=last_stage)
-        self.msgbackend.send(self.outgoing_message_mailbox, msg)
+        self.storage_backend.mark_job_as_canceled(job.job_id)
 
     def report_success(self, job, result):
-        msg = SuccessMessage(job.job_id, result)
-        self.msgbackend.send(self.outgoing_message_mailbox, msg)
+        self.storage_backend.complete_job(job.job_id)
 
     def report_error(self, job, exc, trace):
         trace = traceback.format_exc()
-        logger.warning("Job {} raised an exception: {}".format(job.job_id, trace))
-        msg = FailureMessage(job.job_id, exc, trace)
-        self.msgbackend.send(self.outgoing_message_mailbox, msg)
+        logger.error("Job {} raised an exception: {}".format(job.job_id, trace))
+        self.storage_backend.mark_job_as_failed(job.job_id, exc, trace)
 
     def update_progress(self, job_id, progress, total_progress, stage=""):
-        msg = ProgressMessage(job_id, progress, total_progress, stage)
-        self.msgbackend.send(self.outgoing_message_mailbox, msg)
+        self.storage_backend.update_job_progress(job_id, progress, total_progress)

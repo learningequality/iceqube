@@ -7,8 +7,7 @@ from iceqube.messaging.classes import Message, MessageType
 MAILBOX = "pytesting"
 
 
-@pytest.fixture(params=[MessageType.JOB_FAILED, MessageType.JOB_STARTED, MessageType.JOB_UPDATED,
-                        MessageType.JOB_COMPLETED, MessageType.START_JOB, MessageType.CANCEL_JOB])
+@pytest.fixture(params=[MessageType.START_JOB, MessageType.CANCEL_JOB])
 def msg(request):
     m = Message(request.param, "doesntmatter")
     yield m
@@ -30,7 +29,7 @@ class TestBackend:
         newmsg = defaultbackend.pop(MAILBOX)
 
         assert newmsg.type == msg.type
-        assert newmsg.message == msg.message
+        assert newmsg.job_id == msg.job_id
 
     def test_new_instance_can_send_and_read_to_the_same_mailbox(self, msg, server):
         defaultbackend = insocket.MessagingBackend([MAILBOX])
@@ -43,7 +42,7 @@ class TestBackend:
         newmsg = defaultbackend.pop(MAILBOX)
 
         assert newmsg.type == msg.type
-        assert newmsg.message == msg.message
+        assert newmsg.job_id == msg.job_id
 
     def test_pop_raise_empty_when_no_messages(self, server):
         defaultbackend = insocket.MessagingBackend([MAILBOX])
@@ -66,20 +65,20 @@ class TestBackend:
 
     def test_count_return_one_when_one_message_sent(self, server):
         defaultbackend = insocket.MessagingBackend([MAILBOX])
-        defaultbackend.send(MAILBOX, Message(MessageType.JOB_FAILED, "doesntmatter"))
+        defaultbackend.send(MAILBOX, Message(MessageType.START_JOB, "doesntmatter"))
 
         assert defaultbackend.count(MAILBOX) == 1
 
     def test_count_return_one_when_one_message_sent_other_instance(self, server):
         defaultbackend = insocket.MessagingBackend([MAILBOX])
         otherbackend = insocket.MessagingBackend([MAILBOX])
-        defaultbackend.send(MAILBOX, Message(MessageType.JOB_FAILED, "doesntmatter"))
+        defaultbackend.send(MAILBOX, Message(MessageType.START_JOB, "doesntmatter"))
 
         assert otherbackend.count(MAILBOX) == 1
 
     def test_clear_empties_same_mailbox(self, server):
         defaultbackend = insocket.MessagingBackend([MAILBOX])
-        defaultbackend.send(MAILBOX, Message(MessageType.JOB_FAILED, "doesntmatter"))
+        defaultbackend.send(MAILBOX, Message(MessageType.START_JOB, "doesntmatter"))
 
         defaultbackend.clear(MAILBOX)
 
@@ -87,7 +86,7 @@ class TestBackend:
 
     def test_clear_empties_other_mailbox(self, server):
         defaultbackend = insocket.MessagingBackend([MAILBOX])
-        defaultbackend.send(MAILBOX, Message(MessageType.JOB_FAILED, "doesntmatter"))
+        defaultbackend.send(MAILBOX, Message(MessageType.START_JOB, "doesntmatter"))
 
         defaultbackend.clear(MAILBOX)
 

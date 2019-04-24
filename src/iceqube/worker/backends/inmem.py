@@ -22,18 +22,15 @@ class WorkerBackend(BaseWorkerBackend):
         self.worker_type = worker_type
         super(WorkerBackend, self).__init__(*args, **kwargs)
 
-        # transfer cancel notification mechanism to something that will work for multiprocess Windows and Android,
-        # once we release kolibri 0.5.x
-        self.cancel_notifications = {}
-
-    def schedule_job(self, job):
+    def schedule_job(self, job_id):
         """
         schedule a job to the type of workers spawned by self.start_workers.
 
 
-        :param job: the job to schedule for running.
+        :param job_id: the id of the job to schedule for running.
         :return:
         """
+        job = self.storage_backend.get_job(job_id)
         l = _reraise_with_traceback(job.get_lambda_to_execute())
 
         future = self.workers.submit(l, update_progress_func=self.update_progress, cancel_job_func=self._check_for_cancel)
@@ -44,8 +41,6 @@ class WorkerBackend(BaseWorkerBackend):
 
         # callback for when the future is now!
         future.add_done_callback(self.handle_finished_future)
-        # add the job to our cancel notifications data structure, with False at first
-        self.cancel_notifications[job.job_id] = False
 
         return future
 

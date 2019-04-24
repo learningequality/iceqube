@@ -4,7 +4,7 @@ from iceqube.common.six.moves.queue import Full
 from iceqube.common.utils import InfiniteLoopThread
 from iceqube.compat import Event
 from iceqube.messaging.classes import CancelMessage
-from iceqube.messaging.classes import Message
+from iceqube.messaging.classes import StartMessage
 from iceqube.messaging.classes import MessageType
 
 
@@ -85,7 +85,6 @@ class Scheduler(object):
         Returns: None
 
         """
-        
         next_job = self.storage_backend.get_next_scheduled_job()
         # TODO: don't loop over if workers are already all running
 
@@ -94,11 +93,8 @@ class Scheduler(object):
             return
 
         try:
-            self.messaging_backend.send(self.worker_mailbox,
-                                        Message(
-                                            type=MessageType.START_JOB,
-                                            message={'job': next_job}))
             self.storage_backend.mark_job_as_queued(next_job.job_id)
+            self.messaging_backend.send(self.worker_mailbox, StartMessage(next_job.job_id))
         except Full:
             logging.debug(
                 "Worker queue full; skipping scheduling of job {} for now.".format(next_job.job_id)
@@ -134,13 +130,5 @@ class Scheduler(object):
             total_progress = actual_msg['total_progress']
             self.storage_backend.update_job_progress(job_id, progress,
                                                      total_progress)
-        elif msg.type == MessageType.JOB_COMPLETED:
-            self.storage_backend.complete_job(job_id)
-        elif msg.type == MessageType.JOB_FAILED:
-            exc = actual_msg['exception']
-            trace = actual_msg['traceback']
-            self.storage_backend.mark_job_as_failed(job_id, exc, trace)
-        elif msg.type == MessageType.JOB_CANCELED:
-            self.storage_backend.mark_job_as_canceled(job_id)
         else:
             self.logger.error("Unknown message type: {}".format(msg.type))
