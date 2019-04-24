@@ -33,7 +33,7 @@ class ThreadedTCPServer(ThreadingMixIn, TCPServer, object):
 class TCPRequestHandler(BaseRequestHandler):
 
     def handle(self):
-        conn_id = str(uuid.uuid4())
+        conn_id = uuid.uuid4().hex
         self.server.connections[conn_id] = {
             'handler': self,
             'subscriptions': [conn_id]
@@ -138,7 +138,7 @@ class TCPRequestHandler(BaseRequestHandler):
         if queue in self.server.queues:
             self.server.queues[queue].clear()
 
-        self.broadcast(conn_id, queue, {CLEAR_QUEUE: queue})
+        self.broadcast(conn_id, queue, CLEAR_QUEUE)
 
 
 def _run(exit_event, ready_event, address, port):
