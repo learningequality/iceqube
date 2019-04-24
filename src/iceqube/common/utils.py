@@ -1,11 +1,9 @@
-import abc
 import importlib
 import logging
 import time
 import uuid
 
 from iceqube import compat
-from iceqube.common.six.moves import _thread as thread
 
 
 def stringify_func(func):
@@ -33,25 +31,29 @@ def import_stringified_func(funcstring):
     return func
 
 
-class BaseCloseableThread(compat.Thread):
-    """
-    A base class for a thread that monitors an Event as a signal for shutting down, and a main_loop that otherwise loop
-     until the shutdown event is received.
-    """
-    __metaclass__ = abc.ABCMeta
+class InfiniteLoopThread(compat.Thread):
+    """A class that runs a given function an infinite number of times, until told to shut down."""
 
     DEFAULT_TIMEOUT_SECONDS = 0.2
 
-    def __init__(self, shutdown_event, thread_name, *args, **kwargs):
-        self.shutdown_event = shutdown_event
+    def __init__(self, func, thread_name, wait_between_runs=1, *args, **kwargs):
+        """
+        Run the given func continuously until either shutdown_event is set, or the python interpreter exits.
+        :param func: the function to run. This should accept no arguments.
+        :param thread_name: the name of the thread to use during logging and debugging
+        :param wait_between_runs: how many seconds to wait in between func calls.
+        """
+        self.shutdown_event = compat.Event()
         self.thread_name = thread_name
-        self.thread_id = self._generate_thread_id()
+        self.thread_id = uuid.uuid4().hex
         self.logger = logging.getLogger("{module}.{name}[{id}]".format(module=__name__,
                                                                        name=self.thread_name,
                                                                        id=self.thread_id))
         self.full_thread_name = "{thread_name}-{thread_id}".format(thread_name=self.thread_name,
                                                                    thread_id=self.thread_id)
-        super(BaseCloseableThread, self).__init__(name=self.full_thread_name, *args, **kwargs)
+        super(InfiniteLoopThread, self).__init__(name=self.full_thread_name, *args, **kwargs)
+        self.func = func
+        self.wait = wait_between_runs
 
     def run(self):
         self.logger.info("Started new {name} thread ID#{id}".format(name=self.thread_name,
@@ -60,12 +62,11 @@ class BaseCloseableThread(compat.Thread):
         while True:
             if self.shutdown_event.wait(self.DEFAULT_TIMEOUT_SECONDS):
                 self.logger.warning("{name} shut down event received; closing.".format(name=self.thread_name))
-                thread.exit()
+                break
             else:
                 self.main_loop(timeout=self.DEFAULT_TIMEOUT_SECONDS)
                 continue
 
-    @abc.abstractmethod
     def main_loop(self, timeout):
         """
         The main loop of a thread. Run this loop if we haven't received any shutdown events in the last
@@ -75,34 +76,6 @@ class BaseCloseableThread(compat.Thread):
         :param timeout: a parameter determining how long you can wait for a timeout.
         :return: None
         """
-        pass
-
-    @staticmethod
-    def _generate_thread_id():
-        uid = uuid.uuid4().hex
-        return uid
-
-    def shutdown(self):
-        # stub method, override if you need a more complex shut down procedure.
-        pass
-
-
-class InfiniteLoopThread(BaseCloseableThread):
-    """A class that runs a given function an infinite number of times, until told to shut down."""
-
-    def __init__(self, func, thread_name, wait_between_runs=1):
-        """
-        Run the given func continuously until either shutdown_event is set, or the python interpreter exits.
-        :param func: the function to run. This should accept no arguments.
-        :param thread_name: the name of the thread to use during logging and debugging
-        :param wait_between_runs: how many seconds to wait in between func calls.
-        """
-        self.shutdown_event = compat.Event()
-        super(InfiniteLoopThread, self).__init__(thread_name=thread_name, shutdown_event=self.shutdown_event)
-        self.func = func
-        self.wait = wait_between_runs
-
-    def main_loop(self, timeout):
         try:
             self.func()
         except Exception as e:
@@ -115,39 +88,3 @@ class InfiniteLoopThread(BaseCloseableThread):
 
     def shutdown(self):
         self.stop()
-
-
-class EventWaitingThread(BaseCloseableThread):
-    """
-    A thread class that waits for a compat.Event class passed to it to be set, and then runs the function passed
-    to it.
-    """
-
-    def __init__(self, func, thread_name, trigger_event=None):
-
-        self.shutdown_event = compat.Event()
-        super(EventWaitingThread, self).__init__(thread_name=thread_name, shutdown_event=self.shutdown_event)
-
-        self.func = func
-        self.trigger_event = trigger_event
-
-    def main_loop(self, timeout=None):
-        """
-        Check if self.trigger_event is set. If it is, then run our function. If not, return early.
-        :param timeout: How long to wait for a trigger event. Defaults to 0.
-        :return:
-        """
-        if self.trigger_event.wait(timeout):
-            try:
-                self.func()
-            except Exception as e:
-                self.logger.warning("Got an exception running {func}: {e}".format(func=self.func, e=str(e)))
-            finally:
-                self.trigger_event.clear()
-
-    def trigger(self):
-        """
-        Convenience function for setting the trigger event.
-        :return: None
-        """
-        self.trigger_event.set()

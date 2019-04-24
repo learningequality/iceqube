@@ -166,12 +166,7 @@ class TestClient(object):
 
         # sleep for half a second to make us switch to another thread
         time.sleep(0.5)
-        try:
-            inmem_client.storage.wait_for_job_update(job_id, timeout=2)
-        except Exception:
-            # welp, maybe a job update happened in between that enqueue call and the wait call.
-            # at least we waited!
-            pass
+
         job = inmem_client.status(job_id)
         assert job.state == State.COMPLETED
 
@@ -188,15 +183,19 @@ class TestClient(object):
         job_id = inmem_client.enqueue(
             make_job_updates, flag, track_progress=True)
 
+        # sleep for half a second to make us switch to another thread
+        time.sleep(0.5)
+
         for i in range(2):
-            inmem_client.storage.wait_for_job_update(job_id, timeout=2)
             job = inmem_client.status(job_id)
             assert job.state in [State.QUEUED, State.RUNNING, State.COMPLETED]
 
     def test_can_get_notified_of_job_failure(self, inmem_client):
         job_id = inmem_client.enqueue(failing_func)
 
-        job = inmem_client.storage.wait_for_job_update(job_id, timeout=2)
+        # sleep for half a second to make us switch to another thread
+        time.sleep(0.5)
+        job = inmem_client.status(job_id)
         assert job.state in [State.QUEUED, State.FAILED]
 
     def test_stringify_func_is_importable(self):

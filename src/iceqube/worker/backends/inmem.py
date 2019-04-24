@@ -4,12 +4,16 @@ import traceback
 from concurrent.futures import CancelledError
 from concurrent.futures._base import CANCELLED_AND_NOTIFIED, CANCELLED
 
-from iceqube.common.six.moves.queue import Empty
 from iceqube.common.utils import InfiniteLoopThread
 from iceqube.exceptions import UserCancelledError
 
 
 logger = logging.getLogger(__name__)
+
+
+class Empty(Exception):
+    # An exception to raise when there are now queued jobs waiting to be started.
+    pass
 
 
 class WorkerBackend(object):

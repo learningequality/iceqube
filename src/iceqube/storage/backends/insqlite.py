@@ -303,35 +303,3 @@ class StorageBackend(object):
         """
         return session.query(ORMJob).filter(ORMJob.app == self.app,
                                             ORMJob.namespace == self.namespace)
-
-    def wait_for_job_update(self, job_id, timeout=None):
-        """
-        Blocks until a job given by job_id has updated its state (canceled, completed, progress updated, etc.)
-        if timeout is not None, then this function raises iceqube.exceptions.TimeoutError.
-
-        :param job_id: the job's job_id to monitor for changes.
-        :param timeout: if None, wait forever for a job update. If given, wait until timeout seconds, and then raise
-        iceqube.exceptions.TimeoutError.
-        :return: the Job object corresponding to job_id.
-        """
-        # internally, we register an Event object for each entry in this function.
-        # when self.notify_of_job_update() is called, we call Event.set() on all events
-        # registered for that job, thereby releasing any threads waiting for that specific job.
-
-        session = self.sessionmaker()
-
-        job = self.get_job(job_id, session=session)
-
-        initial_state = job.state
-
-        # How long to wait between polling the job DB
-        interval = 0.1
-        waiting_time = 0
-        while timeout is not None and waiting_time < timeout:
-            time.sleep(interval)
-            waiting_time += interval
-            updated_job = self.get_job(job_id, session=session)
-            if updated_job.state != initial_state:
-                return job
-
-        raise TimeoutError("Job {} has not received any updates.".format(job_id))
