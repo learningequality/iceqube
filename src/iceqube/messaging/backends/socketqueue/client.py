@@ -7,7 +7,6 @@ from iceqube.messaging.backends.socketqueue.common import CLEAR_QUEUE
 from iceqube.messaging.backends.socketqueue.common import GET_QUEUE
 from iceqube.messaging.backends.socketqueue.common import SUBSCRIBE
 from iceqube.messaging.backends.socketqueue.common import UNSUBSCRIBE
-from iceqube.messaging.backends.socketqueue.common import RESPONSE
 from iceqube.messaging.backends.socketqueue.common import SERVER_EXIT
 
 
@@ -16,7 +15,6 @@ class Queue(object):
         self._address = address
         self._port = port
         self._socket = None
-        self._connection_id = None
         self._namespace = namespace
         self._queue = collections.deque(maxlen=10)
         queue = self._get_queue()
@@ -29,7 +27,7 @@ class Queue(object):
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._socket.settimeout(30)
         self._socket.connect((self._address, self._port))
-        self._connection_id, _ = get_message(self._socket)
+        _, _ = get_message(self._socket)
 
         self._subscribe()
 
@@ -74,10 +72,10 @@ class Queue(object):
             except socket.timeout:
                 return None
 
-        if RESPONSE in message and message[RESPONSE] == SERVER_EXIT:
+        if message == SERVER_EXIT:
             self._close()
 
-        if CLEAR_QUEUE in message:
+        if CLEAR_QUEUE == message:
             self._queue.clear()
             # Trying to clear the queue, do so, and then check for another
             # message
@@ -86,13 +84,13 @@ class Queue(object):
         return message
 
     def _get_queue(self):
-        return self._send_message({GET_QUEUE: self._namespace})
+        return self._send_message(GET_QUEUE)
 
     def _subscribe(self):
-        return self._send_message({SUBSCRIBE: self._namespace})
+        return self._send_message(SUBSCRIBE)
 
     def _unsubscribe(self):
-        return self._send_message({UNSUBSCRIBE: self._namespace})
+        return self._send_message(UNSUBSCRIBE)
 
     def get(self, block=True, timeout=None):
         message = None
@@ -112,7 +110,7 @@ class Queue(object):
         self._send_message(message)
 
     def clear(self):
-        self._send_message({CLEAR_QUEUE: self._namespace})
+        self._send_message(CLEAR_QUEUE)
         self._queue.clear()
 
     def qsize(self):

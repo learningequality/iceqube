@@ -13,7 +13,8 @@ from iceqube.messaging.backends.socketqueue.common import CLEAR_QUEUE
 from iceqube.messaging.backends.socketqueue.common import GET_QUEUE
 from iceqube.messaging.backends.socketqueue.common import SUBSCRIBE
 from iceqube.messaging.backends.socketqueue.common import UNSUBSCRIBE
-from iceqube.messaging.backends.socketqueue.common import RESPONSE
+from iceqube.messaging.backends.socketqueue.common import HANDLED
+from iceqube.messaging.backends.socketqueue.common import ERROR
 from iceqube.messaging.backends.socketqueue.common import SERVER_EXIT
 from six.moves.socketserver import BaseRequestHandler, ThreadingMixIn, TCPServer
 
@@ -37,7 +38,7 @@ class TCPRequestHandler(BaseRequestHandler):
             'handler': self,
             'subscriptions': [conn_id]
         }
-        self.respond(conn_id, True)
+        self.respond(conn_id, HANDLED)
 
         while not self.server.exit_event.is_set():
             try:
@@ -57,18 +58,18 @@ class TCPRequestHandler(BaseRequestHandler):
         try:
             queue, message = get_message(request)
 
-            if SUBSCRIBE in message:
-                self.subscribe(conn_id, message[SUBSCRIBE])
-                self.respond(conn_id, True)
-            elif UNSUBSCRIBE in message:
-                self.unsubscribe(conn_id, message[UNSUBSCRIBE])
-                self.respond(conn_id, True)
-            elif GET_QUEUE in message:
-                self.get_queue(conn_id, message[GET_QUEUE])
-            elif CLEAR_QUEUE in message:
-                self.clear_queue(conn_id, message[CLEAR_QUEUE])
+            if SUBSCRIBE == message:
+                self.subscribe(conn_id, queue)
+                self.respond(conn_id, HANDLED)
+            elif UNSUBSCRIBE == message:
+                self.unsubscribe(conn_id, queue)
+                self.respond(conn_id, HANDLED)
+            elif GET_QUEUE == message:
+                self.get_queue(conn_id, queue)
+            elif CLEAR_QUEUE == message:
+                self.clear_queue(conn_id, queue)
             else:
-                self.respond(conn_id, True)
+                self.respond(conn_id, HANDLED)
                 self.broadcast(conn_id, queue, message)
                 self.store_message(queue, message)
 
@@ -76,11 +77,11 @@ class TCPRequestHandler(BaseRequestHandler):
             pass
         except (ConnectionClosed, socket.error):
             raise
-        except Exception as ex:
-            self.respond(conn_id, str(ex))
+        except Exception:
+            self.respond(conn_id, ERROR)
 
-    def respond(self, conn_id, text):
-        send_message(self.request, conn_id, {RESPONSE: text})
+    def respond(self, conn_id, message):
+        send_message(self.request, conn_id, message)
 
     def subscribe(self, conn_id, queues):
         if not queues:
@@ -131,7 +132,7 @@ class TCPRequestHandler(BaseRequestHandler):
         if queue in self.server.queues:
             result = list(self.server.queues[queue])
 
-        send_message(self.request, conn_id, result)
+        self.respond(conn_id, result)
 
     def clear_queue(self, conn_id, queue):
         if queue in self.server.queues:
