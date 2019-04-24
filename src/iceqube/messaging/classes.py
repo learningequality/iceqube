@@ -1,5 +1,3 @@
-import json
-
 from collections import namedtuple
 
 
@@ -15,13 +13,10 @@ class MessageType(object):
 
 
 class Message(namedtuple("_Message", ["type", "job_id"])):
-    def serialize(self):
+    def __init__(self, *args, **kwargs):
+        super(Message, self).__init__()
         # check that message type is in one of the message types we define
-        assert self.type in (
-            t.value for t in list(MessageType)
-        ), "Message type not found in predetermined message type list!"
-
-        return json.dumps({"type": self.type, "job_id": self.job_id})
+        assert self.type in MessageType.__dict__.values(), "Message type not found in predetermined message type list!"
 
 
 class StartMessage(Message):
