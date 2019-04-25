@@ -3,13 +3,13 @@ import time
 import uuid
 
 import pytest
-from iceqube.engine import Engine
-from iceqube.client import Client
+from iceqube.worker import Worker
+from iceqube.queue import Queue
 from iceqube.common.classes import Job
 from iceqube.common.classes import State
+from iceqube.common.compat import Event
 from iceqube.common.utils import import_stringified_func
 from iceqube.common.utils import stringify_func
-from iceqube.compat import Event
 from iceqube.storage.backends import insqlite
 
 
@@ -22,10 +22,10 @@ def backend():
 
 
 @pytest.fixture
-def inmem_client():
+def inmem_queue():
     with tempfile.NamedTemporaryFile() as f:
-        e = Engine(app="pytest", storage_path=f.name)
-        c = Client(app="pytest", storage_path=f.name)
+        e = Worker(app="pytest", storage_path=f.name)
+        c = Queue(app="pytest", storage_path=f.name)
         yield c
         e.shutdown()
 
@@ -36,9 +36,9 @@ def simplejob():
 
 
 @pytest.fixture
-def enqueued_job(inmem_client, simplejob):
-    job_id = inmem_client.enqueue(simplejob)
-    return inmem_client.storage.get_job(job_id)
+def enqueued_job(inmem_queue, simplejob):
+    job_id = inmem_queue.enqueue(simplejob)
+    return inmem_queue.storage.get_job(job_id)
 
 
 def cancelable_job(check_for_cancel=None):
@@ -144,22 +144,22 @@ def failing_func():
         "Test function failing_func has failed as it's supposed to.")
 
 
-class TestClient(object):
-    def test_enqueues_a_function(self, inmem_client):
-        job_id = inmem_client.enqueue(id, 1)
+class TestQueue(object):
+    def test_enqueues_a_function(self, inmem_queue):
+        job_id = inmem_queue.enqueue(id, 1)
 
         # is the job recorded in the chosen backend?
-        assert inmem_client.status(job_id).job_id == job_id
+        assert inmem_queue.fetch_job(job_id).job_id == job_id
 
-    def test_enqueue_preserves_extra_metadata(self, inmem_client):
+    def test_enqueue_preserves_extra_metadata(self, inmem_queue):
         metadata = {"saved": True}
-        job_id = inmem_client.enqueue(id, 1, extra_metadata=metadata)
+        job_id = inmem_queue.enqueue(id, 1, extra_metadata=metadata)
 
         # Do we get back the metadata we save?
-        assert inmem_client.status(job_id).extra_metadata == metadata
+        assert inmem_queue.fetch_job(job_id).extra_metadata == metadata
 
-    def test_enqueue_runs_function(self, inmem_client, flag):
-        job_id = inmem_client.enqueue(set_flag, flag)
+    def test_enqueue_runs_function(self, inmem_queue, flag):
+        job_id = inmem_queue.enqueue(set_flag, flag)
 
         flag.wait(timeout=5)
         assert flag.is_set()
@@ -167,35 +167,35 @@ class TestClient(object):
         # sleep for half a second to make us switch to another thread
         time.sleep(0.5)
 
-        job = inmem_client.status(job_id)
+        job = inmem_queue.fetch_job(job_id)
         assert job.state == State.COMPLETED
 
-    def test_enqueue_can_run_n_functions(self, inmem_client):
+    def test_enqueue_can_run_n_functions(self, inmem_queue):
         n = 10
         events = [EventProxy() for _ in range(n)]
         for e in events:
-            inmem_client.enqueue(set_flag, e)
+            inmem_queue.enqueue(set_flag, e)
 
         for e in events:
             assert e.wait(timeout=2)
 
-    def test_enqueued_job_can_receive_job_updates(self, inmem_client, flag):
-        job_id = inmem_client.enqueue(
+    def test_enqueued_job_can_receive_job_updates(self, inmem_queue, flag):
+        job_id = inmem_queue.enqueue(
             make_job_updates, flag, track_progress=True)
 
         # sleep for half a second to make us switch to another thread
         time.sleep(0.5)
 
         for i in range(2):
-            job = inmem_client.status(job_id)
+            job = inmem_queue.fetch_job(job_id)
             assert job.state in [State.QUEUED, State.RUNNING, State.COMPLETED]
 
-    def test_can_get_notified_of_job_failure(self, inmem_client):
-        job_id = inmem_client.enqueue(failing_func)
+    def test_can_get_notified_of_job_failure(self, inmem_queue):
+        job_id = inmem_queue.enqueue(failing_func)
 
         # sleep for half a second to make us switch to another thread
         time.sleep(0.5)
-        job = inmem_client.status(job_id)
+        job = inmem_queue.fetch_job(job_id)
         assert job.state in [State.QUEUED, State.FAILED]
 
     def test_stringify_func_is_importable(self):
@@ -204,30 +204,30 @@ class TestClient(object):
 
         assert set_flag == func
 
-    def test_can_get_job_details(self, inmem_client, enqueued_job):
-        assert inmem_client.status(
+    def test_can_get_job_details(self, inmem_queue, enqueued_job):
+        assert inmem_queue.fetch_job(
             enqueued_job.job_id).job_id == enqueued_job.job_id
 
-    def test_can_cancel_a_job(self, inmem_client):
-        job_id = inmem_client.enqueue(
+    def test_can_cancel_a_job(self, inmem_queue):
+        job_id = inmem_queue.enqueue(
             cancelable_job,
             cancellable=True
         )
 
-        job = inmem_client.status(job_id)
+        job = inmem_queue.fetch_job(job_id)
         while job.state != State.RUNNING:
             time.sleep(0.1)
-            job = inmem_client.status(job_id)
+            job = inmem_queue.fetch_job(job_id)
         # Job should be running after this point
 
         # Now let's cancel...
-        inmem_client.cancel(job_id)
+        inmem_queue.cancel(job_id)
         # And check the job state to make sure it's marked as cancelling
-        job = inmem_client.status(job_id)
+        job = inmem_queue.fetch_job(job_id)
         assert job.state == State.CANCELING
 
         while job.state != State.CANCELED:
             time.sleep(0.1)
-            job = inmem_client.status(job_id)
+            job = inmem_queue.fetch_job(job_id)
         # and hopefully it's canceled by this point
         assert job.state == State.CANCELED

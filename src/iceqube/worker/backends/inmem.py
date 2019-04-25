@@ -4,8 +4,8 @@ import traceback
 from concurrent.futures import CancelledError
 from concurrent.futures._base import CANCELLED_AND_NOTIFIED, CANCELLED
 
+from iceqube.common.exceptions import UserCancelledError
 from iceqube.common.utils import InfiniteLoopThread
-from iceqube.exceptions import UserCancelledError
 
 
 logger = logging.getLogger(__name__)

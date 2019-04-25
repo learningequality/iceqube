@@ -8,12 +8,6 @@ class BaseError(Exception):
     pass
 
 
-class TimeoutError(BaseError):
-    """
-    An error raised by iceqube.storage.wait() when no job updates come in.
-    """
-
-
 class UserCancelledError(CancelledError):
     """
     An error raised when the user cancels the current job.

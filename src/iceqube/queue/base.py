@@ -1,12 +1,31 @@
-from iceqube.common.classes import Job, State
+from iceqube.common.classes import Job
 from iceqube.storage.backends import insqlite as storage_insqlite
 
 MEMORY = storage_insqlite.StorageBackend.MEMORY
 
 
-class Client(object):
-    def __init__(self, app, storage_path=MEMORY):
+DEFAULT_QUEUE = "ICEQUBE_DEFAULT_QUEUE"
+
+
+class Queue(object):
+    def __init__(self, app=DEFAULT_QUEUE, storage_path=MEMORY):
         self.storage = storage_insqlite.StorageBackend(app, app, storage_path)
+
+    def __len__(self):
+        return self.storage.count_all_jobs()
+
+    @property
+    def job_ids(self):
+        return [job.job_id for job in self.storage.get_all_jobs()]
+
+    @property
+    def jobs(self):
+        """
+        Return all the jobs scheduled, queued, running, failed or completed.
+        Returns: A list of all jobs.
+
+        """
+        return self.storage.get_all_jobs()
 
     def enqueue(self, func, *args, **kwargs):
         """
@@ -56,15 +75,7 @@ class Client(object):
         """
         self.storage.mark_job_as_canceling(job_id)
 
-    def all_jobs(self):
-        """
-        Return all the jobs scheduled, queued, running, failed or completed.
-        Returns: A list of all jobs.
-
-        """
-        return self.storage.get_all_jobs()
-
-    def status(self, job_id):
+    def fetch_job(self, job_id):
         """
         Returns a Job object corresponding to the job_id. From there, you can query for the following attributes:
 
@@ -79,18 +90,22 @@ class Client(object):
         """
         return self.storage.get_job(job_id)
 
-    def clear(self, force=False):
+    def empty(self):
         """
-        Clear all jobs that have succeeded or failed.
-        :type force: bool
-        :param force: Whether to clear all jobs from the job storage queue, regardless if they've been completed or not.
+        Clear all jobs.
         """
-        self.storage.clear(force=force)
+        self.storage.clear(force=True)
 
-    def clear_job(self, job_id, force=False):
+    def clear(self):
         """
-        Clear all jobs that have succeeded or failed.
-        :type force: bool
-        :param force: Whether to clear all jobs from the job storage queue, regardless if they've been completed or not.
+        Clear all succeeded, failed, or cancelled jobs.
         """
-        self.storage.clear(job_id=job_id, force=force)
+        self.storage.clear(force=False)
+
+    def clear_job(self, job_id):
+        """
+        Clear a job if it has succeeded, failed, or been cancelled.
+        :type job_id: str
+        :param job_id: id of job to clear.
+        """
+        self.storage.clear(job_id=job_id, force=False)

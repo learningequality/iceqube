@@ -1,7 +1,6 @@
 import logging
 import uuid
 from copy import copy
-import time
 
 from sqlalchemy import Column, DateTime, Index, Integer, PickleType, String, create_engine, event, func, or_
 from sqlalchemy.ext.declarative import declarative_base
@@ -9,7 +8,6 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.pool import NullPool, StaticPool
 
 from iceqube.common.classes import State
-from iceqube.exceptions import TimeoutError
 
 Base = declarative_base()
 
@@ -159,6 +157,12 @@ class StorageBackend(object):
         s.close()
         return [o.obj for o in orm_jobs]
 
+    def count_all_jobs(self):
+        s = self.sessionmaker()
+        num_jobs = self._ns_query(s).count()
+        s.close()
+        return num_jobs
+
     def get_job(self, job_id, session=None):
         scoped_session = session if session else self.sessionmaker()
         job, _ = self._get_job_and_orm_job(job_id, scoped_session)
@@ -168,13 +172,13 @@ class StorageBackend(object):
 
     def clear(self, job_id=None, force=False):
         """
-        Clear the queue and the job data. If job_id is not given, clear out all
-        jobs marked COMPLETED. If job_id is given, clear out the given job's
-        data. This function won't do anything if the job's state is not COMPLETED or FAILED.
+        Clear the queue and the job data.
+        If force is True, clear all jobs, otherwise only delete jobs that are in a finished state,
+        COMPLETED, FAILED, or CANCELED.
         :type job_id: NoneType or str
         :param job_id: the job_id to clear. If None, clear all jobs.
         :type force: bool
-        :param force: If True, clear the job (or jobs), even if it hasn't completed or failed.
+        :param force: If True, clear the job (or jobs), even if it hasn't completed, failed or been cancelled.
         """
         s = self.sessionmaker()
         q = self._ns_query(s)
@@ -184,7 +188,7 @@ class StorageBackend(object):
         # filter only by the finished jobs, if we are not specified to force
         if not force:
             q = q.filter(
-                or_(ORMJob.state == State.COMPLETED, ORMJob.state == State.FAILED))
+                or_(ORMJob.state == State.COMPLETED, ORMJob.state == State.FAILED, ORMJob.state == State.CANCELED))
 
         q.delete(synchronize_session=False)
         s.commit()
