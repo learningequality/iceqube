@@ -67,14 +67,13 @@ class WorkerBackend(object):
         try:
             result = future.result()
         except CancelledError as e:
-            last_stage = getattr(e, "last_stage", "")
-            self.report_cancelled(job, last_stage=last_stage)
+            self.report_cancelled(job.job_id)
             return
         except Exception as e:
-            self.report_error(job, e, e.traceback)
+            self.report_error(job.job_id, e, e.traceback)
             return
 
-        self.report_success(job, result)
+        self.report_success(job.job_id, result)
 
     def shutdown(self, wait=False):
         self.job_checker.stop()
@@ -103,20 +102,22 @@ class WorkerBackend(object):
             logger.debug("No jobs to start.")
         cancelling_jobs = [job.job_id for job in self.storage_backend.get_canceling_jobs()]
         if cancelling_jobs:
-            for job_id in self.future_job_mapping.keys():
-                if job_id in cancelling_jobs:
+            for job_id in cancelling_jobs:
+                if job_id in self.future_job_mapping.keys():
                     self.cancel(job_id)
+                else:
+                    self.report_cancelled(job_id)
 
-    def report_cancelled(self, job, last_stage):
-        self.storage_backend.mark_job_as_canceled(job.job_id)
+    def report_cancelled(self, job_id):
+        self.storage_backend.mark_job_as_canceled(job_id)
 
-    def report_success(self, job, result):
-        self.storage_backend.complete_job(job.job_id)
+    def report_success(self, job_id, result):
+        self.storage_backend.complete_job(job_id)
 
-    def report_error(self, job, exc, trace):
+    def report_error(self, job_id, exc, trace):
         trace = traceback.format_exc()
-        logger.error("Job {} raised an exception: {}".format(job.job_id, trace))
-        self.storage_backend.mark_job_as_failed(job.job_id, exc, trace)
+        logger.error("Job {} raised an exception: {}".format(job_id, trace))
+        self.storage_backend.mark_job_as_failed(job_id, exc, trace)
 
     def update_progress(self, job_id, progress, total_progress, stage=""):
         self.storage_backend.update_job_progress(job_id, progress, total_progress)
@@ -174,7 +175,7 @@ class WorkerBackend(object):
             else:  # probably finished already, too late to cancel!
                 return False
 
-    def _check_for_cancel(self, job_id, current_stage=""):
+    def _check_for_cancel(self, job_id):
         """
         Check if a job has been requested to be cancelled. When called, the calling function can
         optionally give the stage it is currently in, so the user has information on where the job
@@ -190,7 +191,7 @@ class WorkerBackend(object):
         is_cancelled = future._state in [CANCELLED, CANCELLED_AND_NOTIFIED]
 
         if is_cancelled:
-            raise UserCancelledError(last_stage=current_stage)
+            raise UserCancelledError()
 
 
 def _reraise_with_traceback(f):

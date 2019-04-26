@@ -1,17 +1,12 @@
 from concurrent.futures import CancelledError
 
 
-class BaseError(Exception):
-    """
-    The base exception for all errors raised by iceqube
-    """
-    pass
-
-
 class UserCancelledError(CancelledError):
     """
     An error raised when the user cancels the current job.
     """
+    pass
 
-    def __init__(self, last_stage):
-        self.last_stage = last_stage
+
+class JobNotFound(Exception):
+    pass

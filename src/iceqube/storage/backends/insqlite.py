@@ -8,6 +8,7 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.pool import NullPool, StaticPool
 
 from iceqube.common.classes import State
+from iceqube.common.exceptions import JobNotFound
 
 Base = declarative_base()
 
@@ -294,7 +295,9 @@ class StorageBackend(object):
         return job, orm_job
 
     def _get_job_and_orm_job(self, job_id, session):
-        orm_job = self._ns_query(session).filter_by(id=job_id).one()
+        orm_job = self._ns_query(session).filter_by(id=job_id).one_or_none()
+        if orm_job is None:
+            raise JobNotFound()
         job = orm_job.obj
         return job, orm_job
 
