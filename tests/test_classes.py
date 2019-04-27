@@ -5,18 +5,18 @@ import uuid
 import pytest
 from iceqube.worker import Worker
 from iceqube.queue import Queue
-from iceqube.common.classes import Job
-from iceqube.common.classes import State
-from iceqube.common.compat import Event
-from iceqube.common.utils import import_stringified_func
-from iceqube.common.utils import stringify_func
-from iceqube.storage.backends import insqlite
+from iceqube.classes import Job
+from iceqube.classes import State
+from iceqube.compat import Event
+from iceqube.utils import import_stringified_func
+from iceqube.utils import stringify_func
+from iceqube.storage import Storage
 
 
 @pytest.fixture
 def backend():
     with tempfile.NamedTemporaryFile() as f:
-        b = insqlite.StorageBackend(app="pytest", namespace="test", storage_path=f.name)
+        b = Storage(app="pytest", namespace="test", storage_path=f.name)
         yield b
         b.clear()
 

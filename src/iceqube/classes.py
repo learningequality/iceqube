@@ -2,7 +2,7 @@ import copy
 import logging
 from functools import partial
 
-from iceqube.common.utils import import_stringified_func, stringify_func
+from iceqube.utils import import_stringified_func, stringify_func
 
 logger = logging.getLogger(__name__)
 

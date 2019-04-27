@@ -6,10 +6,10 @@ from copy import copy
 from sqlalchemy import Column, DateTime, Index, Integer, PickleType, String, create_engine, event, func, or_
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import NullPool, StaticPool
+from sqlalchemy.pool import NullPool
 
-from iceqube.common.classes import State
-from iceqube.common.exceptions import JobNotFound
+from iceqube.classes import State
+from iceqube.exceptions import JobNotFound
 
 Base = declarative_base()
 
@@ -46,20 +46,14 @@ class ORMJob(Base):
     __table_args__ = (Index('app_namespace_index', 'app', 'namespace'),)
 
 
-class StorageBackend(object):
-    # constant for specifying an in-memory DB
-    MEMORY = 1
+class Storage(object):
 
     def __init__(self, app, namespace, storage_path, *args, **kwargs):
         self.app = app
         self.namespace = namespace
 
-        if storage_path == self.MEMORY:
-            storage_path = "sqlite:///:memory:"
-            connection_class = StaticPool
-        else:
-            storage_path = "sqlite:///{path}".format(path=storage_path)
-            connection_class = NullPool
+        storage_path = "sqlite:///{path}".format(path=storage_path)
+        connection_class = NullPool
 
         self.engine = create_engine(
             storage_path,

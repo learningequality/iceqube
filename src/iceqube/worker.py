@@ -4,9 +4,10 @@ import traceback
 from concurrent.futures import CancelledError
 from concurrent.futures._base import CANCELLED_AND_NOTIFIED, CANCELLED
 
-from iceqube.common.exceptions import UserCancelledError
-from iceqube.common.utils import InfiniteLoopThread
-
+from iceqube.compat import MULTIPROCESS
+from iceqube.exceptions import UserCancelledError
+from iceqube.utils import InfiniteLoopThread
+from iceqube.storage import Storage
 
 logger = logging.getLogger(__name__)
 
@@ -16,12 +17,9 @@ class Empty(Exception):
     pass
 
 
-class WorkerBackend(object):
-    # worker types
-    PROCESS = 1
-    THREAD = 0
+class Worker(object):
 
-    def __init__(self, storage_backend, num_workers=3, worker_type=THREAD, *args, **kwargs):
+    def __init__(self, app, storage_path, num_workers=3):
         # Internally, we use concurrent.future.Future to run and track
         # job executions. We need to keep track of which future maps to which
         # job they were made from, and we use the job_future_mapping dict to do
@@ -31,8 +29,7 @@ class WorkerBackend(object):
         self.job_future_mapping = {}
         # Key: job_id, Value: future object
         self.future_job_mapping = {}
-        self.worker_type = worker_type
-        self.storage_backend = storage_backend
+        self.storage_backend = Storage(app, app, storage_path)
         self.num_workers = num_workers
 
         self.workers = self.start_workers(num_workers=self.num_workers)
@@ -42,16 +39,12 @@ class WorkerBackend(object):
         self.workers.shutdown(wait=wait)
 
     def start_workers(self, num_workers):
-        if self.worker_type == self.PROCESS:
+        if MULTIPROCESS:
             from concurrent.futures import ProcessPoolExecutor
             worker_executor = ProcessPoolExecutor
-        elif self.worker_type == self.THREAD:
+        else:
             from concurrent.futures import ThreadPoolExecutor
             worker_executor = ThreadPoolExecutor
-        else:
-            raise ValueError(
-                "WorkerBackend.worker_type must be one of [WorkerBackend.PROCESS, WorkerBackend.THREAD]"
-            )
 
         pool = worker_executor(max_workers=num_workers)
         return pool

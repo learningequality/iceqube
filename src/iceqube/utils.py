@@ -3,7 +3,7 @@ import logging
 import time
 import uuid
 
-from iceqube.common import compat
+from iceqube import compat
 
 
 def stringify_func(func):

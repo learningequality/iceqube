@@ -1,22 +1,18 @@
 import pytest
 import time
+import tempfile
 
-from iceqube.common.classes import Job
-from iceqube.common.classes import State
-from iceqube.storage.backends.insqlite import StorageBackend
-from iceqube.worker.backends import inmem
-
-
-@pytest.fixture
-def storage_backend():
-    return StorageBackend("test", "test", StorageBackend.MEMORY)
+from iceqube.classes import Job
+from iceqube.classes import State
+from iceqube.worker import Worker
 
 
 @pytest.fixture
-def worker(storage_backend):
-    b = inmem.WorkerBackend(storage_backend=storage_backend)
-    yield b
-    b.shutdown()
+def worker():
+    with tempfile.NamedTemporaryFile() as f:
+        b = Worker('test', f.name)
+        yield b
+        b.shutdown()
 
 
 class TestWorker:
