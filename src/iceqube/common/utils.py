@@ -46,9 +46,7 @@ class InfiniteLoopThread(compat.Thread):
         self.shutdown_event = compat.Event()
         self.thread_name = thread_name
         self.thread_id = uuid.uuid4().hex
-        self.logger = logging.getLogger("{module}.{name}[{id}]".format(module=__name__,
-                                                                       name=self.thread_name,
-                                                                       id=self.thread_id))
+        self.logger = logging.getLogger("{module}".format(module=__name__.split('.')[0]))
         self.full_thread_name = "{thread_name}-{thread_id}".format(thread_name=self.thread_name,
                                                                    thread_id=self.thread_id)
         super(InfiniteLoopThread, self).__init__(name=self.full_thread_name, *args, **kwargs)

@@ -31,11 +31,6 @@ class TestBackend:
         # Does the job have the right state (QUEUED)?
         assert new_job.state == State.QUEUED
 
-        # Is the job part of the list of queued jobs?
-        assert job_id in [
-            j.job_id for j in defaultbackend.get_queued_jobs()
-        ]
-
     def test_can_cancel_nonrunning_job(self, defaultbackend, simplejob):
         job_id = defaultbackend.enqueue_job(simplejob)
 
@@ -43,11 +38,6 @@ class TestBackend:
 
         # is the job marked with the CANCELED state?
         assert defaultbackend.get_job(job_id).state == State.CANCELED
-
-        # is the job not part of the list of queued jobs
-        assert job_id not in [
-            j.job_id for j in defaultbackend.get_queued_jobs()
-        ]
 
     def test_can_get_first_job_queued(self, defaultbackend):
         job1 = Job(open)

@@ -96,17 +96,16 @@ class WorkerBackend(object):
         Returns: None
         """
         try:
-            while len(self.future_job_mapping.keys()) < self.num_workers:
+            while len(self.future_job_mapping) < self.num_workers:
                 self.start_next_job()
         except Empty:
             logger.debug("No jobs to start.")
-        cancelling_jobs = [job.job_id for job in self.storage_backend.get_canceling_jobs()]
-        if cancelling_jobs:
-            for job_id in cancelling_jobs:
-                if job_id in self.future_job_mapping.keys():
-                    self.cancel(job_id)
-                else:
-                    self.report_cancelled(job_id)
+        for job in self.storage_backend.get_canceling_jobs():
+            job_id = job.job_id
+            if job_id in self.future_job_mapping:
+                self.cancel(job_id)
+            else:
+                self.report_cancelled(job_id)
 
     def report_cancelled(self, job_id):
         self.storage_backend.mark_job_as_canceled(job_id)

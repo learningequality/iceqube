@@ -1,10 +1,11 @@
 import logging
 import uuid
+from contextlib import contextmanager
 from copy import copy
 
 from sqlalchemy import Column, DateTime, Index, Integer, PickleType, String, create_engine, event, func, or_
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool, StaticPool
 
 from iceqube.common.classes import State
@@ -66,10 +67,19 @@ class StorageBackend(object):
             poolclass=connection_class)
         self.set_sqlite_pragmas()
         Base.metadata.create_all(self.engine)
-        self.sessionmaker = scoped_session(sessionmaker(bind=self.engine))
+        self.sessionmaker = sessionmaker(bind=self.engine)
 
-        # create the tables if they don't exist yet
-        super(StorageBackend, self).__init__(*args, **kwargs)
+    @contextmanager
+    def session_scope(self):
+        session = self.sessionmaker()
+        try:
+            yield session
+            session.commit()
+        except:
+            session.rollback()
+            raise
+        finally:
+            session.close()
 
     def set_sqlite_pragmas(self):
         """
@@ -95,21 +105,21 @@ class StorageBackend(object):
         job_id = uuid.uuid4().hex
         j.job_id = job_id
 
-        session = self.sessionmaker()
-        orm_job = ORMJob(
-            id=job_id,
-            state=j.state,
-            app=self.app,
-            namespace=self.namespace,
-            obj=j)
-        session.add(orm_job)
-        try:
-            session.commit()
-        except Exception as e:
-            logging.error(
-                "Got an error running session.commit(): {}".format(e))
+        with self.session_scope() as session:
+            orm_job = ORMJob(
+                id=job_id,
+                state=j.state,
+                app=self.app,
+                namespace=self.namespace,
+                obj=j)
+            session.add(orm_job)
+            try:
+                session.commit()
+            except Exception as e:
+                logging.error(
+                    "Got an error running session.commit(): {}".format(e))
 
-        return job_id
+            return job_id
 
     def mark_job_as_canceled(self, job_id):
         """
@@ -117,59 +127,45 @@ class StorageBackend(object):
         Mark the job as canceled. Does not actually try to cancel a running job.
 
         """
-        job, _ = self._update_job_state(job_id, State.CANCELED)
-        return job
+        self._update_job(job_id, State.CANCELED)
 
     def mark_job_as_canceling(self, job_id):
         """
         Mark the job as requested for canceling. Does not actually try to cancel a running job.
 
         :param job_id: the job to be marked as canceling.
-        :return: the job object
+        :return: None
         """
-
-        job, _ = self._update_job_state(job_id, State.CANCELING)
-        return job
+        self._update_job(job_id, State.CANCELING)
 
     def get_next_queued_job(self):
-        s = self.sessionmaker()
-        orm_job = self._ns_query(s).filter_by(
-            state=State.QUEUED).order_by(ORMJob.queue_order).first()
-        s.close()
-        if orm_job:
-            job = orm_job.obj
-        else:
-            job = None
-        return job
-
-    def get_queued_jobs(self):
-        s = self.sessionmaker()
-        jobs = self._ns_query(s).filter_by(state=State.QUEUED).order_by(ORMJob.queue_order)
-        return [job.obj for job in jobs]
+        with self.session_scope() as s:
+            orm_job = self._ns_query(s).filter_by(
+                state=State.QUEUED).order_by(ORMJob.queue_order).first()
+            if orm_job:
+                job = orm_job.obj
+            else:
+                job = None
+            return job
 
     def get_canceling_jobs(self):
-        s = self.sessionmaker()
-        jobs = self._ns_query(s).filter_by(state=State.CANCELING).order_by(ORMJob.queue_order)
-        return [job.obj for job in jobs]
+        with self.session_scope() as s:
+            jobs = self._ns_query(s).filter_by(state=State.CANCELING).order_by(ORMJob.queue_order)
+            return [job.obj for job in jobs]
 
     def get_all_jobs(self):
-        s = self.sessionmaker()
-        orm_jobs = self._ns_query(s).all()
-        s.close()
-        return [o.obj for o in orm_jobs]
+        with self.session_scope() as s:
+            orm_jobs = self._ns_query(s).all()
+            return [o.obj for o in orm_jobs]
 
     def count_all_jobs(self):
-        s = self.sessionmaker()
-        num_jobs = self._ns_query(s).count()
-        s.close()
-        return num_jobs
+        with self.session_scope() as s:
+            return self._ns_query(s).count()
 
-    def get_job(self, job_id, session=None):
-        scoped_session = session if session else self.sessionmaker()
-        job, _ = self._get_job_and_orm_job(job_id, scoped_session)
-        if not session:  # session was created by our hand. Close it now.
-            scoped_session.close()
-        return job
+    def get_job(self, job_id):
+        with self.session_scope() as session:
+            job, _ = self._get_job_and_orm_job(job_id, session)
+            return job
 
     def clear(self, job_id=None, force=False):
         """
@@ -181,19 +177,17 @@ class StorageBackend(object):
         :type force: bool
         :param force: If True, clear the job (or jobs), even if it hasn't completed, failed or been cancelled.
         """
-        s = self.sessionmaker()
-        q = self._ns_query(s)
-        if job_id:
-            q = q.filter_by(id=job_id)
+        with self.session_scope() as s:
+            q = self._ns_query(s)
+            if job_id:
+                q = q.filter_by(id=job_id)
 
-        # filter only by the finished jobs, if we are not specified to force
-        if not force:
-            q = q.filter(
-                or_(ORMJob.state == State.COMPLETED, ORMJob.state == State.FAILED, ORMJob.state == State.CANCELED))
+            # filter only by the finished jobs, if we are not specified to force
+            if not force:
+                q = q.filter(
+                    or_(ORMJob.state == State.COMPLETED, ORMJob.state == State.FAILED, ORMJob.state == State.CANCELED))
 
-        q.delete(synchronize_session=False)
-        s.commit()
-        s.close()
+            q.delete(synchronize_session=False)
 
     def update_job_progress(self, job_id, progress, total_progress):
         """
@@ -204,32 +198,9 @@ class StorageBackend(object):
         :param job_id: The id of the job to update
         :param progress: The current progress achieved by the job
         :param total_progress: The total progress achievable by the job.
-        :return: the job_id
+        :return: None
         """
-
-        session = self.sessionmaker()
-        job, orm_job = self._update_job_state(
-            job_id, state=State.RUNNING, session=session)
-
-        # Note (aron): looks like SQLAlchemy doesn't automatically
-        # save any pickletype fields even if we re-set (orm_job.obj = job) that
-        # field. My hunch is that it's tracking the id of the object,
-        # and if that doesn't change, then SQLAlchemy doesn't repickle the object
-        # and save to the DB.
-        # Our hack here is to just copy the job object, and then set thespecific
-        # field we want to edit, in this case the job.state. That forces
-        # SQLAlchemy to re-pickle the object, thus setting it to the correct state.
-
-        job = copy(job)
-
-        job.progress = progress
-        job.total_progress = total_progress
-        orm_job.obj = job
-
-        session.add(orm_job)
-        session.commit()
-        session.close()
-        return job_id
+        self._update_job(job_id, State.RUNNING, progress=progress, total_progress=total_progress)
 
     def mark_job_as_failed(self, job_id, exception, traceback):
         """
@@ -243,56 +214,35 @@ class StorageBackend(object):
         Returns: None
 
         """
-        session = self.sessionmaker()
-        job, orm_job = self._update_job_state(
-            job_id, State.FAILED, session=session)
-
-        # Note (aron): looks like SQLAlchemy doesn't automatically
-        # save any pickletype fields even if we re-set (orm_job.obj = job) that
-        # field. My hunch is that it's tracking the id of the object,
-        # and if that doesn't change, then SQLAlchemy doesn't repickle the object
-        # and save to the DB.
-        # Our hack here is to just copy the job object, and then set thespecific
-        # field we want to edit, in this case the job.state. That forces
-        # SQLAlchemy to re-pickle the object, thus setting it to the correct state.
-        job = copy(job)
-
-        job.exception = exception
-        job.traceback = traceback
-        orm_job.obj = job
-
-        session.add(orm_job)
-        session.commit()
-        session.close()
+        self._update_job(job_id, State.FAILED, exception=exception, traceback=traceback)
 
     def mark_job_as_running(self, job_id):
-        self._update_job_state(job_id, State.RUNNING)
+        self._update_job(job_id, State.RUNNING)
 
     def complete_job(self, job_id):
-        self._update_job_state(job_id, State.COMPLETED)
+        self._update_job(job_id, State.COMPLETED)
 
-    def _update_job_state(self, job_id, state, session=None):
-        scoped_session = session if session else self.sessionmaker()
+    def _update_job(self, job_id, state, **kwargs):
+        with self.session_scope() as session:
 
-        job, orm_job = self._get_job_and_orm_job(job_id, scoped_session)
+            job, orm_job = self._get_job_and_orm_job(job_id, session)
 
-        # Note (aron): looks like SQLAlchemy doesn't automatically
-        # save any pickletype fields even if we re-set (orm_job.obj = job) that
-        # field. My hunch is that it's tracking the id of the object,
-        # and if that doesn't change, then SQLAlchemy doesn't repickle the object
-        # and save to the DB.
-        # Our hack here is to just copy the job object, and then set thespecific
-        # field we want to edit, in this case the job.state. That forces
-        # SQLAlchemy to re-pickle the object, thus setting it to the correct state.
-        job = copy(job)
+            # Note (aron): looks like SQLAlchemy doesn't automatically
+            # save any pickletype fields even if we re-set (orm_job.obj = job) that
+            # field. My hunch is that it's tracking the id of the object,
+            # and if that doesn't change, then SQLAlchemy doesn't repickle the object
+            # and save to the DB.
+            # Our hack here is to just copy the job object, and then set thespecific
+            # field we want to edit, in this case the job.state. That forces
+            # SQLAlchemy to re-pickle the object, thus setting it to the correct state.
+            job = copy(job)
 
-        orm_job.state = job.state = state
-        orm_job.obj = job
-        scoped_session.add(orm_job)
-        if not session:  # session was created by our hand. Close it now.
-            scoped_session.commit()
-            scoped_session.close()
-        return job, orm_job
+            orm_job.state = job.state = state
+            for kwarg in kwargs:
+                setattr(job, kwarg, kwargs[kwarg])
+            orm_job.obj = job
+            session.add(orm_job)
+            return job, orm_job
 
     def _get_job_and_orm_job(self, job_id, session):
         orm_job = self._ns_query(session).filter_by(id=job_id).one_or_none()

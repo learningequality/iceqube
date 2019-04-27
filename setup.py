@@ -37,9 +37,9 @@ setup(
     packages=[
         'iceqube',
         'iceqube.common',
+        'iceqube.queue',
         'iceqube.storage',
         'iceqube.storage.backends',
-        'iceqube.queue',
         'iceqube.worker',
         'iceqube.worker.backends'
     ],
