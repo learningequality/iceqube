@@ -61,6 +61,13 @@ class Job(object):
         :param func: func can be a callable object, in which case it is turned into an importable string,
         or it can be an importable string already.
         """
+        if isinstance(func, Job):
+            args = copy.copy(func.args)
+            kwargs = copy.copy(func.kwargs)
+            kwargs['track_progress'] = func.track_progress
+            kwargs['cancellable'] = func.cancellable
+            kwargs['extra_metadata'] = func.extra_metadata.copy()
+            func = func.func
         self.job_id = uuid.uuid4().hex
         self.state = kwargs.pop('state', State.QUEUED)
         self.traceback = ""

@@ -62,24 +62,27 @@ class InfiniteLoopThread(compat.Thread):
                 self.logger.warning("{name} shut down event received; closing.".format(name=self.thread_name))
                 break
             else:
-                self.main_loop(timeout=self.DEFAULT_TIMEOUT_SECONDS)
+                self.main_loop()
                 continue
 
-    def main_loop(self, timeout):
+    def main_loop(self):
         """
         The main loop of a thread. Run this loop if we haven't received any shutdown events in the last
-        timeout seconds. Normally this is used to read from a queue; you are encouraged to return from
-        this function if the timeout parameter has elapsed, to allow the thread to continue to check
-        for the shutdown event.
-        :param timeout: a parameter determining how long you can wait for a timeout.
+        timeout seconds. Normally this is used to read from a queue; the func can return an argument that
+        indicates how long the function took to execute, and to correct the waiting time on the next
+        interval - this is useful if you want the function to run at a fixed interval.
         :return: None
         """
         try:
-            self.func()
+            corrected_time = self.func()
         except Exception as e:
             self.logger.warning("Got an exception running {func}: {e}".format(func=self.func, e=str(e)))
+            corrected_time = 0
 
-        time.sleep(self.wait)
+        wait = self.wait - (corrected_time if corrected_time is not None else 0)
+
+        if wait > 0:
+            time.sleep(wait)
 
     def stop(self):
         self.shutdown_event.set()
