@@ -1,5 +1,7 @@
 import copy
 import logging
+import uuid
+
 from functools import partial
 
 from iceqube.utils import import_stringified_func, stringify_func
@@ -59,7 +61,7 @@ class Job(object):
         :param func: func can be a callable object, in which case it is turned into an importable string,
         or it can be an importable string already.
         """
-        self.job_id = kwargs.pop('job_id', None)
+        self.job_id = uuid.uuid4().hex
         self.state = kwargs.pop('state', State.QUEUED)
         self.traceback = ""
         self.exception = None

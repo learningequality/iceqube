@@ -1,21 +1,23 @@
 from iceqube.classes import Job
+from iceqube.classes import State
 from iceqube.storage import Storage
 
 DEFAULT_QUEUE = "ICEQUBE_DEFAULT_QUEUE"
 
 
 class Queue(object):
-    def __init__(self, app=DEFAULT_QUEUE, connection=None):
+    def __init__(self, queue=DEFAULT_QUEUE, connection=None):
         if connection is None:
-            raise ValueError('Connection must be defined')
-        self.storage = Storage(app, app, connection)
+            raise ValueError("Connection must be defined")
+        self.name = queue
+        self.storage = Storage(connection)
 
     def __len__(self):
-        return self.storage.count_all_jobs()
+        return self.storage.count_all_jobs(self.name)
 
     @property
     def job_ids(self):
-        return [job.job_id for job in self.storage.get_all_jobs()]
+        return [job.job_id for job in self.storage.get_all_jobs(self.name)]
 
     @property
     def jobs(self):
@@ -24,7 +26,7 @@ class Queue(object):
         Returns: A list of all jobs.
 
         """
-        return self.storage.get_all_jobs()
+        return self.storage.get_all_jobs(self.name)
 
     def enqueue(self, func, *args, **kwargs):
         """
@@ -59,10 +61,9 @@ class Queue(object):
         else:
             job = Job(func, *args, **kwargs)
 
-        job.track_progress = kwargs.pop('track_progress', False)
-        job.cancellable = kwargs.pop('cancellable', False)
-        job.extra_metadata = kwargs.pop('extra_metadata', {})
-        job_id = self.storage.enqueue_job(job)
+        job.state = State.QUEUED
+
+        job_id = self.storage.enqueue_job(job, self.name)
         return job_id
 
     def cancel(self, job_id):
@@ -93,13 +94,13 @@ class Queue(object):
         """
         Clear all jobs.
         """
-        self.storage.clear(force=True)
+        self.storage.clear(force=True, queue=self.name)
 
     def clear(self):
         """
         Clear all succeeded, failed, or cancelled jobs.
         """
-        self.storage.clear(force=False)
+        self.storage.clear(force=False, queue=self.name)
 
     def clear_job(self, job_id):
         """

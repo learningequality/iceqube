@@ -10,15 +10,18 @@ from sqlalchemy import create_engine
 from sqlalchemy.pool import NullPool
 
 
+QUEUE = "pytest"
+
+
 @pytest.fixture
 def worker():
     with tempfile.NamedTemporaryFile() as f:
         connection = create_engine(
             "sqlite:///{path}".format(path=f.name),
-            connect_args={'check_same_thread': False},
+            connect_args={"check_same_thread": False},
             poolclass=NullPool,
         )
-        b = Worker('test', connection=connection)
+        b = Worker(QUEUE, connection)
         yield b
         b.shutdown()
 
@@ -26,10 +29,10 @@ def worker():
 class TestWorker:
     def test_enqueue_job_runs_job(self, worker):
         job = Job(id, 9)
-        worker.storage_backend.enqueue_job(job)
+        worker.storage.enqueue_job(job, QUEUE)
 
         while job.state == State.QUEUED:
-            job = worker.storage_backend.get_job(job.job_id)
+            job = worker.storage.get_job(job.job_id)
             time.sleep(0.5)
         try:
             # Get the future, or pass if it has already been cleaned up.
@@ -42,14 +45,14 @@ class TestWorker:
         assert job.state == State.COMPLETED
 
     def test_enqueue_job_writes_to_storage_on_success(self, worker, mocker):
-        mocker.spy(worker.storage_backend, 'complete_job')
+        mocker.spy(worker.storage, "complete_job")
 
         # this job should never fail.
         job = Job(id, 9)
-        worker.storage_backend.enqueue_job(job)
+        worker.storage.enqueue_job(job, QUEUE)
 
         while job.state == State.QUEUED:
-            job = worker.storage_backend.get_job(job.job_id)
+            job = worker.storage.get_job(job.job_id)
             time.sleep(0.5)
 
         try:
@@ -61,9 +64,9 @@ class TestWorker:
             pass
 
         # verify that we sent a message through our backend
-        assert worker.storage_backend.complete_job.call_count == 1
+        assert worker.storage.complete_job.call_count == 1
 
-        call_args = worker.storage_backend.complete_job.call_args
+        call_args = worker.storage.complete_job.call_args
         job_id = call_args[0][0]
         # verify that we're setting the correct job_id
         assert job_id == job.job_id

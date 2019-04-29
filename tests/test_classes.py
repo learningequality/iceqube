@@ -21,10 +21,10 @@ def backend():
     with tempfile.NamedTemporaryFile() as f:
         connection = create_engine(
             "sqlite:///{path}".format(path=f.name),
-            connect_args={'check_same_thread': False},
+            connect_args={"check_same_thread": False},
             poolclass=NullPool,
         )
-        b = Storage(app="pytest", namespace="test", connection=connection)
+        b = Storage(connection)
         yield b
         b.clear()
 
@@ -34,11 +34,12 @@ def inmem_queue():
     with tempfile.NamedTemporaryFile() as f:
         connection = create_engine(
             "sqlite:///{path}".format(path=f.name),
-            connect_args={'check_same_thread': False},
+            connect_args={"check_same_thread": False},
             poolclass=NullPool,
         )
-        e = Worker("pytest", connection=connection)
-        c = Queue(app="pytest", connection=connection)
+        e = Worker(queues="pytest", connection=connection)
+        c = Queue(queue="pytest", connection=connection)
+        c.e = e
         yield c
         e.shutdown()
 
@@ -153,8 +154,7 @@ def make_job_updates(flag, update_progress):
 
 
 def failing_func():
-    raise Exception(
-        "Test function failing_func has failed as it's supposed to.")
+    raise Exception("Test function failing_func has failed as it's supposed to.")
 
 
 def update_progress_cancelable_job(update_progress, check_for_cancel=None):
@@ -213,8 +213,7 @@ class TestQueue(object):
             assert e.wait(timeout=2)
 
     def test_enqueued_job_can_receive_job_updates(self, inmem_queue, flag):
-        job_id = inmem_queue.enqueue(
-            make_job_updates, flag, track_progress=True)
+        job_id = inmem_queue.enqueue(make_job_updates, flag, track_progress=True)
 
         # sleep for half a second to make us switch to another thread
         time.sleep(0.5)
@@ -243,14 +242,10 @@ class TestQueue(object):
         assert set_flag == func
 
     def test_can_get_job_details(self, inmem_queue, enqueued_job):
-        assert inmem_queue.fetch_job(
-            enqueued_job.job_id).job_id == enqueued_job.job_id
+        assert inmem_queue.fetch_job(enqueued_job.job_id).job_id == enqueued_job.job_id
 
     def test_can_cancel_a_job(self, inmem_queue):
-        job_id = inmem_queue.enqueue(
-            cancelable_job,
-            cancellable=True
-        )
+        job_id = inmem_queue.enqueue(cancelable_job, cancellable=True)
 
         interval = 0.1
         time_spent = 0
@@ -278,9 +273,7 @@ class TestQueue(object):
 
     def test_can_cancel_a_job_that_updates_progress(self, inmem_queue):
         job_id = inmem_queue.enqueue(
-            update_progress_cancelable_job,
-            cancellable=True,
-            track_progress=True,
+            update_progress_cancelable_job, cancellable=True, track_progress=True
         )
 
         interval = 0.1
