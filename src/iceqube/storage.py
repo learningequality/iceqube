@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from copy import copy
 
 from sqlalchemy import Column, DateTime, Index, Integer, PickleType, String, create_engine, event, func, or_
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
@@ -86,7 +87,18 @@ class Storage(object):
         """
 
         def _pragmas_on_connect(dbapi_con, con_record):
-            dbapi_con.execute("PRAGMA journal_mode = WAL;")
+            """
+            Set pragmas on every connection, as it is the only way to guarantee
+            that they are set.
+            However, some pragmas, like the wal journal_mode we use below
+            will generate errors if a transaction is currently open on the
+            database - so try to do this, but catch and pass if it produces
+            an error.
+            """
+            try:
+                dbapi_con.execute("PRAGMA journal_mode = WAL;")
+            except OperationalError:
+                pass
 
         event.listen(self.engine, "connect", _pragmas_on_connect)
 
