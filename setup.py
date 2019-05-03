@@ -36,14 +36,6 @@ setup(
     package_dir={'': "src"},
     packages=[
         'iceqube',
-        'iceqube.common',
-        'iceqube.messaging',
-        'iceqube.messaging.backends',
-        'iceqube.scheduler',
-        'iceqube.storage',
-        'iceqube.storage.backends',
-        'iceqube.worker',
-        'iceqube.worker.backends'
     ],
     url='https://github.com/learningequality/iceqube',
     version=iceqube.__version__,

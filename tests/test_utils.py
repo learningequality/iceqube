@@ -1,7 +1,7 @@
 import threading
 import time
 
-from iceqube.common.utils import InfiniteLoopThread
+from iceqube.utils import InfiniteLoopThread
 
 
 class TestBaseCloseableThread(object):
@@ -17,14 +17,12 @@ class TestBaseCloseableThread(object):
 
         for a fuller explanation.
 
-        The test here is to see if InfiniteLoopThread (and by extension BaseCloseableThread)
-        can handle threading._time being None. We import InfiniteLoopThread
-        because it's easier to test.
+        The test here is to see if InfiniteLoopThread
+        can handle threading._time being None.
 
         Make sure to use the actual threading module.
         """
 
-        ev = threading.Event()
         with mocker.patch.object(threading, "_time"):
             t = InfiniteLoopThread(lambda: id(1), thread_name='test')
             t.start()
