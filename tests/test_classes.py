@@ -214,10 +214,14 @@ class TestQueue(object):
             cancellable=True
         )
 
+        interval = 0.1
+        time_spent = 0
         job = inmem_queue.fetch_job(job_id)
         while job.state != State.RUNNING:
-            time.sleep(0.1)
+            time.sleep(interval)
+            time_spent += interval
             job = inmem_queue.fetch_job(job_id)
+            assert time_spent < 5
         # Job should be running after this point
 
         # Now let's cancel...
@@ -225,9 +229,11 @@ class TestQueue(object):
         # And check the job state to make sure it's marked as cancelling
         job = inmem_queue.fetch_job(job_id)
         assert job.state == State.CANCELING
-
+        time_spent = 0
         while job.state != State.CANCELED:
-            time.sleep(0.1)
+            time.sleep(interval)
+            time_spent += interval
             job = inmem_queue.fetch_job(job_id)
+            assert time_spent < 5
         # and hopefully it's canceled by this point
         assert job.state == State.CANCELED
