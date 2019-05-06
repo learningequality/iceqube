@@ -21,14 +21,12 @@ clean-pyc:
 	find . -name '*~' -exec rm -f {} +
 
 dist:
-	rm -r dist/*
-	./pants setup-py src:lib
-	./pants setup-py --setup-py-run="bdist_wheel --universal -d $(PWD)/dist" src:lib
-	# Copy over the generated setup.py to the root dir, to allow github installation
-	cp dist/iceqube-*/setup.py ./setup.py
+	rm -fr dist/*
+	python setup.py sdist --format=gztar > /dev/null # silence the sdist output! Too noisy!
+	python setup.py bdist_wheel --universal
 
 release: dist
-	twine upload dist/iceqube-*.{whl,tar.gz}
+	twine upload -s dist/*
 
 test:
 	py.test
