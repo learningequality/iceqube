@@ -6,11 +6,19 @@ from iceqube.classes import State
 from iceqube.utils import stringify_func
 from iceqube.storage import Storage
 
+from sqlalchemy import create_engine
+from sqlalchemy.pool import NullPool
+
 
 @pytest.fixture
 def defaultbackend():
     with tempfile.NamedTemporaryFile() as f:
-        b = Storage(app="pytest", namespace="test", storage_path=f.name)
+        connection = create_engine(
+            "sqlite:///{path}".format(path=f.name),
+            connect_args={'check_same_thread': False},
+            poolclass=NullPool,
+        )
+        b = Storage(app="pytest", namespace="test", connection=connection)
         yield b
         b.clear()
 

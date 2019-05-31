@@ -5,10 +5,10 @@ DEFAULT_QUEUE = "ICEQUBE_DEFAULT_QUEUE"
 
 
 class Queue(object):
-    def __init__(self, app=DEFAULT_QUEUE, storage_path=None):
-        if storage_path is None:
-            raise ValueError('Storage path must be defined')
-        self.storage = Storage(app, app, storage_path)
+    def __init__(self, app=DEFAULT_QUEUE, connection=None):
+        if connection is None:
+            raise ValueError('Connection must be defined')
+        self.storage = Storage(app, app, connection)
 
     def __len__(self):
         return self.storage.count_all_jobs()

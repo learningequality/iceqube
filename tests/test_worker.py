@@ -6,11 +6,19 @@ from iceqube.classes import Job
 from iceqube.classes import State
 from iceqube.worker import Worker
 
+from sqlalchemy import create_engine
+from sqlalchemy.pool import NullPool
+
 
 @pytest.fixture
 def worker():
     with tempfile.NamedTemporaryFile() as f:
-        b = Worker('test', f.name)
+        connection = create_engine(
+            "sqlite:///{path}".format(path=f.name),
+            connect_args={'check_same_thread': False},
+            poolclass=NullPool,
+        )
+        b = Worker('test', connection=connection)
         yield b
         b.shutdown()
 

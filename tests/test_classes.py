@@ -12,11 +12,19 @@ from iceqube.utils import import_stringified_func
 from iceqube.utils import stringify_func
 from iceqube.storage import Storage
 
+from sqlalchemy import create_engine
+from sqlalchemy.pool import NullPool
+
 
 @pytest.fixture
 def backend():
     with tempfile.NamedTemporaryFile() as f:
-        b = Storage(app="pytest", namespace="test", storage_path=f.name)
+        connection = create_engine(
+            "sqlite:///{path}".format(path=f.name),
+            connect_args={'check_same_thread': False},
+            poolclass=NullPool,
+        )
+        b = Storage(app="pytest", namespace="test", connection=connection)
         yield b
         b.clear()
 
@@ -24,8 +32,13 @@ def backend():
 @pytest.fixture
 def inmem_queue():
     with tempfile.NamedTemporaryFile() as f:
-        e = Worker(app="pytest", storage_path=f.name)
-        c = Queue(app="pytest", storage_path=f.name)
+        connection = create_engine(
+            "sqlite:///{path}".format(path=f.name),
+            connect_args={'check_same_thread': False},
+            poolclass=NullPool,
+        )
+        e = Worker("pytest", connection=connection)
+        c = Queue(app="pytest", connection=connection)
         yield c
         e.shutdown()
 
@@ -213,10 +226,15 @@ class TestQueue(object):
     def test_can_get_notified_of_job_failure(self, inmem_queue):
         job_id = inmem_queue.enqueue(failing_func)
 
-        # sleep for half a second to make us switch to another thread
-        time.sleep(0.5)
+        interval = 0.1
+        time_spent = 0
         job = inmem_queue.fetch_job(job_id)
-        assert job.state in [State.QUEUED, State.FAILED]
+        while job.state != State.FAILED:
+            time.sleep(interval)
+            time_spent += interval
+            job = inmem_queue.fetch_job(job_id)
+            assert time_spent < 5
+        assert job.state == State.FAILED
 
     def test_stringify_func_is_importable(self):
         funcstring = stringify_func(set_flag)
