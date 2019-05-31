@@ -206,7 +206,7 @@ class Storage(object):
         :param total_progress: The total progress achievable by the job.
         :return: None
         """
-        self._update_job(job_id, State.RUNNING, progress=progress, total_progress=total_progress)
+        self._update_job(job_id, progress=progress, total_progress=total_progress)
 
     def mark_job_as_failed(self, job_id, exception, traceback):
         """
@@ -228,7 +228,7 @@ class Storage(object):
     def complete_job(self, job_id):
         self._update_job(job_id, State.COMPLETED)
 
-    def _update_job(self, job_id, state, **kwargs):
+    def _update_job(self, job_id, state=None, **kwargs):
         with self.session_scope() as session:
 
             job, orm_job = self._get_job_and_orm_job(job_id, session)
@@ -242,8 +242,8 @@ class Storage(object):
             # field we want to edit, in this case the job.state. That forces
             # SQLAlchemy to re-pickle the object, thus setting it to the correct state.
             job = copy(job)
-
-            orm_job.state = job.state = state
+            if state is not None:
+                orm_job.state = job.state = state
             for kwarg in kwargs:
                 setattr(job, kwarg, kwargs[kwarg])
             orm_job.obj = job

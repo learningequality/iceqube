@@ -144,6 +144,26 @@ def failing_func():
         "Test function failing_func has failed as it's supposed to.")
 
 
+def update_progress_cancelable_job(update_progress, check_for_cancel=None):
+    """
+    Test function for checking if a job is cancelable when it updates progress.
+    Meant to be used in a job cancel with progress update test case.
+
+    It then calls the check_for_cancel, followed by a time.sleep function, 10 times.
+
+    :param update_progress: A function that is called to update progress
+    :param check_for_cancel: A function that the iceqube framework passes in when a job is set to be cancellable.
+    Calling this function makes the thread check if a cancellation has been requested, and then exits early if true.
+    :return: None
+    """
+
+    for i in range(10):
+        time.sleep(0.5)
+        update_progress(i, 9)
+        if check_for_cancel():
+            return
+
+
 class TestQueue(object):
     def test_enqueues_a_function(self, inmem_queue):
         job_id = inmem_queue.enqueue(id, 1)
@@ -212,6 +232,37 @@ class TestQueue(object):
         job_id = inmem_queue.enqueue(
             cancelable_job,
             cancellable=True
+        )
+
+        interval = 0.1
+        time_spent = 0
+        job = inmem_queue.fetch_job(job_id)
+        while job.state != State.RUNNING:
+            time.sleep(interval)
+            time_spent += interval
+            job = inmem_queue.fetch_job(job_id)
+            assert time_spent < 5
+        # Job should be running after this point
+
+        # Now let's cancel...
+        inmem_queue.cancel(job_id)
+        # And check the job state to make sure it's marked as cancelling
+        job = inmem_queue.fetch_job(job_id)
+        assert job.state == State.CANCELING
+        time_spent = 0
+        while job.state != State.CANCELED:
+            time.sleep(interval)
+            time_spent += interval
+            job = inmem_queue.fetch_job(job_id)
+            assert time_spent < 5
+        # and hopefully it's canceled by this point
+        assert job.state == State.CANCELED
+
+    def test_can_cancel_a_job_that_updates_progress(self, inmem_queue):
+        job_id = inmem_queue.enqueue(
+            update_progress_cancelable_job,
+            cancellable=True,
+            track_progress=True,
         )
 
         interval = 0.1
