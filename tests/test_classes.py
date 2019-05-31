@@ -37,7 +37,7 @@ def inmem_queue():
             connect_args={'check_same_thread': False},
             poolclass=NullPool,
         )
-        e = Worker(app="pytest", connection=connection)
+        e = Worker("pytest", connection=connection)
         c = Queue(app="pytest", connection=connection)
         yield c
         e.shutdown()
