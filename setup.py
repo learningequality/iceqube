@@ -1,13 +1,24 @@
+import codecs
 import os
-import sys
+import re
 
 from setuptools import setup
 
-# Add the package source
-sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
+here = os.path.abspath(os.path.dirname(__file__))
 
-# Import our package
-import iceqube  # noqa
+
+def read(*parts):
+    with codecs.open(os.path.join(here, *parts), 'r') as fp:
+        return fp.read()
+
+
+def find_version(*file_paths):
+    version_file = read(*file_paths)
+    version_match = re.search(r"^__version__ = ['\"]([^'\"]*)['\"]",
+                              version_file, re.M)
+    if version_match:
+        return version_match.group(1)
+    raise RuntimeError("Unable to find version string.")
 
 
 setup(
@@ -38,6 +49,6 @@ setup(
         'iceqube',
     ],
     url='https://github.com/learningequality/iceqube',
-    version=iceqube.__version__,
+    version=find_version('src', 'iceqube', '__init__.py'),
     zip_safe=True
 )
