@@ -18,7 +18,7 @@ def worker():
             connect_args={'check_same_thread': False},
             poolclass=NullPool,
         )
-        b = Worker('test', connection)
+        b = Worker('test', connection=connection)
         yield b
         b.shutdown()
 
