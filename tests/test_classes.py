@@ -12,11 +12,19 @@ from iceqube.utils import import_stringified_func
 from iceqube.utils import stringify_func
 from iceqube.storage import Storage
 
+from sqlalchemy import create_engine
+from sqlalchemy.pool import NullPool
+
 
 @pytest.fixture
 def backend():
     with tempfile.NamedTemporaryFile() as f:
-        b = Storage(app="pytest", namespace="test", storage_path=f.name)
+        connection = create_engine(
+            "sqlite:///{path}".format(path=f.name),
+            connect_args={'check_same_thread': False},
+            poolclass=NullPool,
+        )
+        b = Storage(app="pytest", namespace="test", connection=connection)
         yield b
         b.clear()
 
@@ -24,8 +32,13 @@ def backend():
 @pytest.fixture
 def inmem_queue():
     with tempfile.NamedTemporaryFile() as f:
-        e = Worker(app="pytest", storage_path=f.name)
-        c = Queue(app="pytest", storage_path=f.name)
+        connection = create_engine(
+            "sqlite:///{path}".format(path=f.name),
+            connect_args={'check_same_thread': False},
+            poolclass=NullPool,
+        )
+        e = Worker(app="pytest", connection=connection)
+        c = Queue(app="pytest", connection=connection)
         yield c
         e.shutdown()
 

@@ -19,17 +19,19 @@ class Empty(Exception):
 
 class Worker(object):
 
-    def __init__(self, app, storage_path, num_workers=3):
+    def __init__(self, app, connection=None, num_workers=3):
         # Internally, we use concurrent.future.Future to run and track
         # job executions. We need to keep track of which future maps to which
         # job they were made from, and we use the job_future_mapping dict to do
         # so.
+        if connection is None:
+            raise ValueError('Connection must be defined')
 
         # Key: future object, Value: job object
         self.job_future_mapping = {}
         # Key: job_id, Value: future object
         self.future_job_mapping = {}
-        self.storage_backend = Storage(app, app, storage_path)
+        self.storage_backend = Storage(app, app, connection)
         self.num_workers = num_workers
 
         self.workers = self.start_workers(num_workers=self.num_workers)

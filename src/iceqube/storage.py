@@ -3,11 +3,10 @@ import uuid
 from contextlib import contextmanager
 from copy import copy
 
-from sqlalchemy import Column, DateTime, Index, Integer, PickleType, String, create_engine, event, func, or_
+from sqlalchemy import Column, DateTime, Index, Integer, PickleType, String, event, func, or_
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import NullPool
 
 from iceqube.classes import State
 from iceqube.exceptions import JobNotFound
@@ -49,17 +48,11 @@ class ORMJob(Base):
 
 class Storage(object):
 
-    def __init__(self, app, namespace, storage_path, *args, **kwargs):
+    def __init__(self, app, namespace, connection, *args, **kwargs):
         self.app = app
         self.namespace = namespace
 
-        storage_path = "sqlite:///{path}".format(path=storage_path)
-        connection_class = NullPool
-
-        self.engine = create_engine(
-            storage_path,
-            connect_args={'check_same_thread': False},
-            poolclass=connection_class)
+        self.engine = connection
         self.set_sqlite_pragmas()
         Base.metadata.create_all(self.engine)
         self.sessionmaker = sessionmaker(bind=self.engine)
