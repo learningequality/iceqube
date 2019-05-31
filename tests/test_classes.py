@@ -206,10 +206,15 @@ class TestQueue(object):
     def test_can_get_notified_of_job_failure(self, inmem_queue):
         job_id = inmem_queue.enqueue(failing_func)
 
-        # sleep for half a second to make us switch to another thread
-        time.sleep(0.5)
+        interval = 0.1
+        time_spent = 0
         job = inmem_queue.fetch_job(job_id)
-        assert job.state in [State.QUEUED, State.FAILED]
+        while job.state != State.FAILED:
+            time.sleep(interval)
+            time_spent += interval
+            job = inmem_queue.fetch_job(job_id)
+            assert time_spent < 5
+        assert job.state == State.FAILED
 
     def test_stringify_func_is_importable(self):
         funcstring = stringify_func(set_flag)
