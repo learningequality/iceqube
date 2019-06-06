@@ -53,7 +53,8 @@ class Storage(object):
         self.namespace = namespace
 
         self.engine = connection
-        self.set_sqlite_pragmas()
+        if self.engine.name == "sqlite":
+            self.set_sqlite_pragmas()
         Base.metadata.create_all(self.engine)
         self.sessionmaker = sessionmaker(bind=self.engine)
 
@@ -78,22 +79,10 @@ class Storage(object):
 
         :return: None
         """
-
-        def _pragmas_on_connect(dbapi_con, con_record):
-            """
-            Set pragmas on every connection, as it is the only way to guarantee
-            that they are set.
-            However, some pragmas, like the wal journal_mode we use below
-            will generate errors if a transaction is currently open on the
-            database - so try to do this, but catch and pass if it produces
-            an error.
-            """
-            try:
-                dbapi_con.execute("PRAGMA journal_mode = WAL;")
-            except OperationalError:
-                pass
-
-        event.listen(self.engine, "connect", _pragmas_on_connect)
+        try:
+            self.engine.execute("PRAGMA journal_mode = WAL;")
+        except OperationalError:
+            pass
 
     def enqueue_job(self, j):
         """
