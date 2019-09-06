@@ -6,18 +6,26 @@ from iceqube.exceptions import JobNotFound
 from iceqube.queue import Queue
 from iceqube.scheduler import Scheduler
 
+from sqlalchemy import create_engine
+from sqlalchemy.pool import NullPool
+
 
 @pytest.fixture
 def queue():
     with tempfile.NamedTemporaryFile() as f:
-        q = Queue("pytest", storage_path=f.name)
+        connection = create_engine(
+            "sqlite:///{path}".format(path=f.name),
+            connect_args={"check_same_thread": False},
+            poolclass=NullPool,
+        )
+        q = Queue("pytest", connection)
         yield q
 
 
 @pytest.fixture
 def scheduler(queue):
     with tempfile.NamedTemporaryFile() as f:
-        s = Scheduler(queue, storage_path=f.name)
+        s = Scheduler(queue=queue)
         yield s
 
 
@@ -33,13 +41,17 @@ class TestScheduler(object):
         job_id = scheduler.enqueue_at(now, id)
 
         with scheduler.session_scope() as session:
-            scheduled_job = scheduler._ns_query(session).filter_by(id=job_id).one_or_none()
+            scheduled_job = (
+                scheduler._ns_query(session).filter_by(id=job_id).one_or_none()
+            )
             scheduled_time = scheduled_job.scheduled_time
         assert scheduled_time == now
 
     def test_enqueue_at_preserves_extra_metadata(self, scheduler):
         metadata = {"saved": True}
-        job_id = scheduler.enqueue_at(datetime.datetime.utcnow(), id, extra_metadata=metadata)
+        job_id = scheduler.enqueue_at(
+            datetime.datetime.utcnow(), id, extra_metadata=metadata
+        )
 
         # Do we get back the metadata we save?
         assert scheduler.get_job(job_id).extra_metadata == metadata
@@ -57,7 +69,9 @@ class TestScheduler(object):
         job_id = scheduler.enqueue_in(diff, id)
 
         with scheduler.session_scope() as session:
-            scheduled_job = scheduler._ns_query(session).filter_by(id=job_id).one_or_none()
+            scheduled_job = (
+                scheduler._ns_query(session).filter_by(id=job_id).one_or_none()
+            )
             scheduled_time = scheduled_job.scheduled_time
         assert scheduled_time == now + diff
 
@@ -74,16 +88,20 @@ class TestScheduler(object):
         job_id = scheduler.schedule(now, id)
 
         with scheduler.session_scope() as session:
-            scheduled_job = scheduler._ns_query(session).filter_by(id=job_id).one_or_none()
+            scheduled_job = (
+                scheduler._ns_query(session).filter_by(id=job_id).one_or_none()
+            )
             scheduled_time = scheduled_job.scheduled_time
         assert scheduled_time == now
 
     def test_schedule_a_function_gives_value_error_without_datetime(self, scheduler):
-        now = 'test'
+        now = "test"
         with pytest.raises(ValueError):
             scheduler.schedule(now, id)
 
-    def test_schedule_a_function_gives_value_error_repeat_zero_interval(self, scheduler):
+    def test_schedule_a_function_gives_value_error_repeat_zero_interval(
+        self, scheduler
+    ):
         now = datetime.datetime.utcnow()
         with pytest.raises(ValueError):
             scheduler.schedule(now, id, interval=0, repeat=None)
@@ -110,7 +128,9 @@ class TestScheduler(object):
         scheduler.check_schedule()
         assert scheduler.queue.fetch_job(job_id).job_id == job_id
 
-    def test_scheduled_repeating_function_sets_new_job_with_one_fewer_repeats(self, scheduler):
+    def test_scheduled_repeating_function_sets_new_job_with_one_fewer_repeats(
+        self, scheduler
+    ):
         now = datetime.datetime.utcnow()
         scheduler.schedule(now, id, interval=1000, repeat=1)
         scheduler.check_schedule()

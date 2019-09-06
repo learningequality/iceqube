@@ -2,17 +2,15 @@ import time
 
 from datetime import datetime
 from datetime import timedelta
-from contextlib import contextmanager
 
-from sqlalchemy import Column, DateTime, Index, Integer, PickleType, String, create_engine, event
+from sqlalchemy import Column, DateTime, Index, Integer, PickleType, String
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import NullPool
 
 from iceqube.classes import Job
 from iceqube.classes import State
 from iceqube.exceptions import JobNotFound
 from iceqube.queue import Queue
+from iceqube.storage import StorageMixin
 from iceqube.utils import InfiniteLoopThread
 
 Base = declarative_base()
@@ -26,6 +24,7 @@ class ScheduledJob(Base):
     The DB representation of a scheduled job,
     storing the relevant details needed to schedule jobs.
     """
+
     __tablename__ = "scheduledjobs"
 
     # The hex UUID given to the job upon first creation
@@ -45,56 +44,26 @@ class ScheduledJob(Base):
 
     scheduled_time = Column(DateTime())
 
-    __table_args__ = (Index('queue__scheduled_time', 'queue', 'scheduled_time'),)
+    __table_args__ = (Index("queue__scheduled_time", "queue", "scheduled_time"),)
 
 
-class Scheduler(object):
-
-    def __init__(self, queue, storage_path=None, interval=DEFAULT_INTERVAL):
-        if storage_path is None:
-            raise ValueError('Storage path must be defined')
-        if not isinstance(queue, Queue):
-            raise ValueError('The passed in queue must be an instance of a Queue')
-        self.queue = queue
+class Scheduler(StorageMixin):
+    def __init__(self, queue=None, connection=None, interval=DEFAULT_INTERVAL):
+        if connection is None and not isinstance(queue, Queue):
+            raise ValueError("One of either connection or queue must be specified")
+        elif connection is not None and isinstance(queue, Queue):
+            raise ValueError(
+                "One of either connection or queue must be specified, but not both"
+            )
+        elif isinstance(queue, Queue):
+            self.queue = queue
+            connection = self.queue.storage.engine
+        elif connection:
+            self.queue = queue(connection=connection)
 
         self.interval = interval
 
-        storage_path = "sqlite:///{path}".format(path=storage_path)
-
-        self.engine = create_engine(
-            storage_path,
-            connect_args={'check_same_thread': False},
-            poolclass=NullPool)
-        self.set_sqlite_pragmas()
-        Base.metadata.create_all(self.engine)
-        self.sessionmaker = sessionmaker(bind=self.engine)
-
-    @contextmanager
-    def session_scope(self):
-        session = self.sessionmaker()
-        try:
-            yield session
-            session.commit()
-        except:
-            session.rollback()
-            raise
-        finally:
-            session.close()
-
-    def set_sqlite_pragmas(self):
-        """
-        Sets the connection PRAGMAs for the sqlalchemy engine stored in self.engine.
-
-        It currently sets:
-        - journal_mode to WAL
-
-        :return: None
-        """
-
-        def _pragmas_on_connect(dbapi_con, con_record):
-            dbapi_con.execute("PRAGMA journal_mode = WAL;")
-
-        event.listen(self.engine, "connect", _pragmas_on_connect)
+        super(Scheduler, self).__init__(connection, Base=Base)
 
     def start_schedule_checker(self):
         """
@@ -102,7 +71,11 @@ class Scheduler(object):
         and checks for cancellation requests for jobs currently assigned to a worker.
         Returns: the Thread object.
         """
-        t = InfiniteLoopThread(self.check_schedule, thread_name="SCHEDULECHECKER", wait_between_runs=self.interval)
+        t = InfiniteLoopThread(
+            self.check_schedule,
+            thread_name="SCHEDULECHECKER",
+            wait_between_runs=self.interval,
+        )
         t.start()
         return t
 
@@ -132,7 +105,7 @@ class Scheduler(object):
         Add the job to the scheduler in the specified time delta
         """
         if not isinstance(delta_t, timedelta):
-            raise ValueError('Time argument must be a timedelta object.')
+            raise ValueError("Time argument must be a timedelta object.")
         dt = self._now() + delta_t
         return self.schedule(dt, func, interval=0, repeat=0, *args, **kwargs)
 
@@ -143,9 +116,9 @@ class Scheduler(object):
         interval.
         """
         if not isinstance(dt, datetime):
-            raise ValueError('Time argument must be a datetime object.')
+            raise ValueError("Time argument must be a datetime object.")
         if not interval and repeat != 0:
-            raise ValueError('Must specify an interval if the task is repeating')
+            raise ValueError("Must specify an interval if the task is repeating")
         if isinstance(func, Job):
             job = func
         # else, turn it into a job first.
@@ -161,7 +134,8 @@ class Scheduler(object):
                 interval=interval,
                 repeat=repeat,
                 scheduled_time=dt,
-                obj=job)
+                obj=job,
+            )
             session.add(scheduled_job)
 
             return job.job_id
@@ -199,7 +173,9 @@ class Scheduler(object):
         start = time.time()
         now = self._now()
         with self.session_scope() as s:
-            scheduled_jobs = self._ns_query(s).filter(ScheduledJob.scheduled_time <= now)
+            scheduled_jobs = self._ns_query(s).filter(
+                ScheduledJob.scheduled_time <= now
+            )
             for scheduled_job in scheduled_jobs:
                 new_repeat = 0
                 repeat = False

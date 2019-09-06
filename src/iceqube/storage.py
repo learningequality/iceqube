@@ -41,8 +41,8 @@ class ORMJob(Base):
     time_updated = Column(DateTime(timezone=True), server_onupdate=func.now())
 
 
-class Storage(object):
-    def __init__(self, connection, *args, **kwargs):
+class StorageMixin(object):
+    def __init__(self, connection, Base=Base):
         self.engine = connection
         if self.engine.name == "sqlite":
             self.set_sqlite_pragmas()
@@ -75,6 +75,8 @@ class Storage(object):
         except OperationalError:
             pass
 
+
+class Storage(StorageMixin):
     def enqueue_job(self, j, queue):
         """
         Add the job given by j to the job queue.
