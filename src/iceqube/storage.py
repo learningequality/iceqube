@@ -1,9 +1,8 @@
 import logging
-import uuid
 from contextlib import contextmanager
 from copy import copy
 
-from sqlalchemy import Column, DateTime, Index, Integer, PickleType, String, event, func, or_
+from sqlalchemy import Column, DateTime, Integer, PickleType, String, func, or_
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
@@ -20,6 +19,7 @@ class ORMJob(Base):
     storing the relevant details needed by the job storage
     backend.
     """
+
     __tablename__ = "jobs"
 
     # The hex UUID given to the job upon first creation
@@ -31,11 +31,8 @@ class ORMJob(Base):
     # The job's order in the entire global queue of jobs.
     queue_order = Column(Integer, autoincrement=True)
 
-    # The app name passed to the client when the job is scheduled.
-    app = Column(String, index=True)
-
-    # The app name passed to the client when the job is scheduled.
-    namespace = Column(String, index=True)
+    # The queue name passed to the client when the job is scheduled.
+    queue = Column(String, index=True)
 
     # The original Job object, pickled here for so we can easily access it.
     obj = Column(PickleType)
@@ -43,15 +40,9 @@ class ORMJob(Base):
     time_created = Column(DateTime(timezone=True), server_default=func.now())
     time_updated = Column(DateTime(timezone=True), server_onupdate=func.now())
 
-    __table_args__ = (Index('app_namespace_index', 'app', 'namespace'),)
 
-
-class Storage(object):
-
-    def __init__(self, app, namespace, connection, *args, **kwargs):
-        self.app = app
-        self.namespace = namespace
-
+class StorageMixin(object):
+    def __init__(self, connection, Base=Base):
         self.engine = connection
         if self.engine.name == "sqlite":
             self.set_sqlite_pragmas()
@@ -84,30 +75,31 @@ class Storage(object):
         except OperationalError:
             pass
 
-    def enqueue_job(self, j):
+
+class Storage(StorageMixin):
+    def enqueue_job(self, j, queue):
         """
         Add the job given by j to the job queue.
 
         Note: Does not actually run the job.
         """
-        job_id = uuid.uuid4().hex
-        j.job_id = job_id
-
         with self.session_scope() as session:
-            orm_job = ORMJob(
-                id=job_id,
-                state=j.state,
-                app=self.app,
-                namespace=self.namespace,
-                obj=j)
-            session.add(orm_job)
+            orm_job = session.query(ORMJob).get(j.job_id)
+            if orm_job and orm_job.state not in [
+                State.COMPLETED,
+                State.FAILED,
+                State.CANCELED,
+            ]:
+                # If this job is already queued or running, don't try to replace it.
+                return j.job_id
+            orm_job = ORMJob(id=j.job_id, state=j.state, queue=queue, obj=j)
+            session.merge(orm_job)
             try:
                 session.commit()
             except Exception as e:
-                logging.error(
-                    "Got an error running session.commit(): {}".format(e))
+                logging.error("Got an error running session.commit(): {}".format(e))
 
-            return job_id
+            return j.job_id
 
     def mark_job_as_canceled(self, job_id):
         """
@@ -126,36 +118,46 @@ class Storage(object):
         """
         self._update_job(job_id, State.CANCELING)
 
-    def get_next_queued_job(self):
+    def get_next_queued_job(self, queues):
         with self.session_scope() as s:
-            orm_job = self._ns_query(s).filter_by(
-                state=State.QUEUED).order_by(ORMJob.queue_order).first()
+            orm_job = (
+                s.query(ORMJob)
+                .filter(ORMJob.queue.in_(queues))
+                .filter_by(state=State.QUEUED)
+                .order_by(ORMJob.queue_order)
+                .first()
+            )
             if orm_job:
                 job = orm_job.obj
             else:
                 job = None
             return job
 
-    def get_canceling_jobs(self):
+    def get_canceling_jobs(self, queues):
         with self.session_scope() as s:
-            jobs = self._ns_query(s).filter_by(state=State.CANCELING).order_by(ORMJob.queue_order)
+            jobs = (
+                s.query(ORMJob)
+                .filter(ORMJob.queue.in_(queues))
+                .filter_by(state=State.CANCELING)
+                .order_by(ORMJob.queue_order)
+            )
             return [job.obj for job in jobs]
 
-    def get_all_jobs(self):
+    def get_all_jobs(self, queue):
         with self.session_scope() as s:
-            orm_jobs = self._ns_query(s).all()
+            orm_jobs = s.query(ORMJob).filter(ORMJob.queue == queue).all()
             return [o.obj for o in orm_jobs]
 
-    def count_all_jobs(self):
+    def count_all_jobs(self, queue):
         with self.session_scope() as s:
-            return self._ns_query(s).count()
+            return s.query(ORMJob).filter(ORMJob.queue == queue).count()
 
     def get_job(self, job_id):
         with self.session_scope() as session:
             job, _ = self._get_job_and_orm_job(job_id, session)
             return job
 
-    def clear(self, job_id=None, force=False):
+    def clear(self, queue=None, job_id=None, force=False):
         """
         Clear the queue and the job data.
         If force is True, clear all jobs, otherwise only delete jobs that are in a finished state,
@@ -166,14 +168,21 @@ class Storage(object):
         :param force: If True, clear the job (or jobs), even if it hasn't completed, failed or been cancelled.
         """
         with self.session_scope() as s:
-            q = self._ns_query(s)
+            q = s.query(ORMJob)
+            if queue:
+                q = q.filter_by(queue=queue)
             if job_id:
                 q = q.filter_by(id=job_id)
 
             # filter only by the finished jobs, if we are not specified to force
             if not force:
                 q = q.filter(
-                    or_(ORMJob.state == State.COMPLETED, ORMJob.state == State.FAILED, ORMJob.state == State.CANCELED))
+                    or_(
+                        ORMJob.state == State.COMPLETED,
+                        ORMJob.state == State.FAILED,
+                        ORMJob.state == State.CANCELED,
+                    )
+                )
 
             q.delete(synchronize_session=False)
 
@@ -233,18 +242,8 @@ class Storage(object):
             return job, orm_job
 
     def _get_job_and_orm_job(self, job_id, session):
-        orm_job = self._ns_query(session).filter_by(id=job_id).one_or_none()
+        orm_job = session.query(ORMJob).filter_by(id=job_id).one_or_none()
         if orm_job is None:
             raise JobNotFound()
         job = orm_job.obj
         return job, orm_job
-
-    def _ns_query(self, session):
-        """
-        Return a SQLAlchemy query that is already namespaced by the app and namespace given to this backend
-        during initialization.
-        Returns: a SQLAlchemy query object
-
-        """
-        return session.query(ORMJob).filter(ORMJob.app == self.app,
-                                            ORMJob.namespace == self.namespace)

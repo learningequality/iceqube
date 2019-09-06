@@ -18,20 +18,23 @@ class Empty(Exception):
 
 
 class Worker(object):
-
-    def __init__(self, app, connection=None, num_workers=3):
+    def __init__(self, queues, connection=None, num_workers=3):
         # Internally, we use concurrent.future.Future to run and track
         # job executions. We need to keep track of which future maps to which
         # job they were made from, and we use the job_future_mapping dict to do
         # so.
         if connection is None:
-            raise ValueError('Connection must be defined')
+            raise ValueError("Connection must be defined")
 
+        # Queues that this worker executes tasks for
+        if type(queues) is not list:
+            queues = [queues]
+        self.queues = queues
         # Key: future object, Value: job object
         self.job_future_mapping = {}
         # Key: job_id, Value: future object
         self.future_job_mapping = {}
-        self.storage_backend = Storage(app, app, connection)
+        self.storage = Storage(connection)
         self.num_workers = num_workers
 
         self.workers = self.start_workers(num_workers=self.num_workers)
@@ -43,9 +46,11 @@ class Worker(object):
     def start_workers(self, num_workers):
         if MULTIPROCESS:
             from concurrent.futures import ProcessPoolExecutor
+
             worker_executor = ProcessPoolExecutor
         else:
             from concurrent.futures import ThreadPoolExecutor
+
             worker_executor = ThreadPoolExecutor
 
         pool = worker_executor(max_workers=num_workers)
@@ -80,7 +85,9 @@ class Worker(object):
         and checks for cancellation requests for jobs currently assigned to a worker.
         Returns: the Thread object.
         """
-        t = InfiniteLoopThread(self.check_jobs, thread_name="JOBCHECKER", wait_between_runs=0.5)
+        t = InfiniteLoopThread(
+            self.check_jobs, thread_name="JOBCHECKER", wait_between_runs=0.5
+        )
         t.start()
         return t
 
@@ -95,7 +102,7 @@ class Worker(object):
                 self.start_next_job()
         except Empty:
             logger.debug("No jobs to start.")
-        for job in self.storage_backend.get_canceling_jobs():
+        for job in self.storage.get_canceling_jobs(self.queues):
             job_id = job.job_id
             if job_id in self.future_job_mapping:
                 self.cancel(job_id)
@@ -103,18 +110,18 @@ class Worker(object):
                 self.report_cancelled(job_id)
 
     def report_cancelled(self, job_id):
-        self.storage_backend.mark_job_as_canceled(job_id)
+        self.storage.mark_job_as_canceled(job_id)
 
     def report_success(self, job_id, result):
-        self.storage_backend.complete_job(job_id)
+        self.storage.complete_job(job_id)
 
     def report_error(self, job_id, exc, trace):
         trace = traceback.format_exc()
         logger.error("Job {} raised an exception: {}".format(job_id, trace))
-        self.storage_backend.mark_job_as_failed(job_id, exc, trace)
+        self.storage.mark_job_as_failed(job_id, exc, trace)
 
     def update_progress(self, job_id, progress, total_progress, stage=""):
-        self.storage_backend.update_job_progress(job_id, progress, total_progress)
+        self.storage.update_job_progress(job_id, progress, total_progress)
 
     def start_next_job(self):
         """
@@ -122,16 +129,20 @@ class Worker(object):
 
         :return future:
         """
-        job = self.storage_backend.get_next_queued_job()
+        job = self.storage.get_next_queued_job(self.queues)
 
         if not job:
             raise Empty
 
-        self.storage_backend.mark_job_as_running(job.job_id)
+        self.storage.mark_job_as_running(job.job_id)
 
         l = _reraise_with_traceback(job.get_lambda_to_execute())
 
-        future = self.workers.submit(l, update_progress_func=self.update_progress, cancel_job_func=self._check_for_cancel)
+        future = self.workers.submit(
+            l,
+            update_progress_func=self.update_progress,
+            cancel_job_func=self._check_for_cancel,
+        )
 
         # assign the futures to a dict, mapping them to a job
         self.job_future_mapping[future] = job
@@ -164,6 +175,7 @@ class Worker(object):
                 # Our cancelling callback will then check this variable to see its state,
                 # and exit if it's cancelled.
                 from concurrent.futures._base import CANCELLED
+
                 future._state = CANCELLED
                 return False
             else:  # probably finished already, too late to cancel!
