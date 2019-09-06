@@ -136,7 +136,7 @@ class Scheduler(StorageMixin):
                 scheduled_time=dt,
                 obj=job,
             )
-            session.add(scheduled_job)
+            session.merge(scheduled_job)
 
             return job.job_id
 
@@ -186,17 +186,17 @@ class Scheduler(StorageMixin):
                     new_repeat = scheduled_job.repeat - 1
                     repeat = True
                 job_for_queue = scheduled_job.obj
+                self.queue.enqueue(job_for_queue)
                 if repeat:
-                    # Schedule another job to repeat this
-                    new_job = Job(job_for_queue)
+                    # Update this scheduled job to repeat this
                     self.schedule(
                         self._now() + timedelta(seconds=scheduled_job.interval),
-                        new_job,
+                        job_for_queue,
                         interval=scheduled_job.interval,
                         repeat=new_repeat,
                     )
-                self.queue.enqueue(job_for_queue)
-                s.delete(scheduled_job)
+                else:
+                    s.delete(scheduled_job)
             return time.time() - start
 
     def _ns_query(self, session):

@@ -73,3 +73,22 @@ class TestBackend:
 
         # is the job marked as completed?
         assert job.state == State.COMPLETED
+
+    def test_can_requeue_complete_job(self, defaultbackend, simplejob):
+        """
+        When we call backend.complete_job, it should mark the job as finished, and
+        remove it from the queue.
+        """
+
+        job_id = defaultbackend.enqueue_job(simplejob, QUEUE)
+        defaultbackend.complete_job(job_id)
+
+        job = defaultbackend.get_job(job_id)
+
+        # is the job marked as completed?
+        assert job.state == State.COMPLETED
+
+        defaultbackend.enqueue_job(simplejob, QUEUE)
+        requeued_job = defaultbackend.get_job(job_id)
+
+        assert requeued_job.state == State.QUEUED

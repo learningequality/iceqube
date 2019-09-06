@@ -106,12 +106,12 @@ class TestScheduler(object):
         with pytest.raises(ValueError):
             scheduler.schedule(now, id, interval=0, repeat=None)
 
-    def test_scheduled_repeating_function_sets_new_job(self, scheduler):
+    def test_scheduled_repeating_function_updates_old_job(self, scheduler):
         now = datetime.datetime.utcnow()
         old_id = scheduler.schedule(now, id, interval=1000, repeat=None)
         scheduler.check_schedule()
         new_id = scheduler.get_jobs()[0].job_id
-        assert old_id != new_id
+        assert old_id == new_id
 
     def test_scheduled_repeating_function_sets_endless_repeat_new_job(self, scheduler):
         now = datetime.datetime.utcnow()

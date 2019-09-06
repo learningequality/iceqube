@@ -84,8 +84,16 @@ class Storage(StorageMixin):
         Note: Does not actually run the job.
         """
         with self.session_scope() as session:
+            orm_job = session.query(ORMJob).get(j.job_id)
+            if orm_job and orm_job.state not in [
+                State.COMPLETED,
+                State.FAILED,
+                State.CANCELED,
+            ]:
+                # If this job is already queued or running, don't try to replace it.
+                return j.job_id
             orm_job = ORMJob(id=j.job_id, state=j.state, queue=queue, obj=j)
-            session.add(orm_job)
+            session.merge(orm_job)
             try:
                 session.commit()
             except Exception as e:
