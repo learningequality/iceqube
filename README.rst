@@ -15,13 +15,10 @@ Iceqube
 A self-contained pure python messaging and task queue system, with
 optional non-Python dependencies
 
-Installation
-============
-
-Requirements
-------------
-
 The base installation requires either Python 2.7, or 3.4+.
+
+CAUTION: This library is used internally within Kolibri. It is not being maintained or supported for external usage.
+
 
 Goals
 =====
@@ -32,11 +29,7 @@ Goals
    use other backends and services (Django, Google PubSub etc.) will
    require more dependencies.
 
-Problems with current pure python task queues
----------------------------------------------
+Problems with current pure python task queues:
 
 1. Does not work with Windows out of the box.
 2. Does not support progress tracking.
-
-Design
-======
